@@ -39,9 +39,37 @@ abort() {
   if [ ! -f /tmp/anykernel/anykernel.sh -o "$(file_getprop /tmp/anykernel/anykernel.sh do.cleanuponabort 2>/dev/null)" == 1 ]; then
     cleanup;
   fi;
-  umount /system;
-  umount /data 2>/dev/null;
+  umount -l /system_root 2>/dev/null
   exit 1;
+}
+is_mounted() {
+  if [ ! -z "$2" ]; then
+    cat /proc/mounts | grep $1 | grep $2, >/dev/null
+  else
+    cat /proc/mounts | grep $1 >/dev/null
+  fi
+  return $?
+}
+mount_system() { 
+  # Check A/B slot
+  SLOT=`getprop ro.boot.slot_suffix`
+  [ -z $SLOT ] || ui_print "A/B partition detected, current slot: $SLOT"
+  ui_print "Mounting /system for addon.d script"
+  is_mounted /system || [ -f /system/build.prop ] || mount -o rw /system 2>/dev/null
+  if ! is_mounted /system && ! [ -f /system/build.prop ]; then
+    SYSTEMBLOCK=`find /dev/block -iname system$SLOT | head -n 1`
+    mount -t ext4 -o rw $SYSTEMBLOCK /system
+  fi
+  is_mounted /system || [ -f /system/build.prop ] || abort "! Cannot mount /system"
+  cat /proc/mounts | grep -E '/dev/root|/system_root' >/dev/null && SKIP_INITRAMFS=true || SKIP_INITRAMFS=false
+  if [ -f /system/init.rc ]; then
+    SKIP_INITRAMFS=true
+    mkdir /system_root 2>/dev/null
+    mount --move /system /system_root
+    mount -o bind /system_root/system /system
+  fi
+  $SKIP_INITRAMFS && ui_print "Device skip_initramfs detected"
+  ui_print " "
 }
 
 show_progress 1.34 4;
@@ -61,10 +89,8 @@ ui_print "$(file_getprop /tmp/anykernel/anykernel.sh kernel.string)";
 ui_print " ";
 ui_print "AnyKernel2 by osm0sis @ xda-developers";
 ui_print " ";
-umount /system 2>/dev/null;
-mount -o ro -t auto /system;
+mount_system
 mount /data 2>/dev/null;
-test -f /system/system/build.prop && root=/system;
 
 if [ "$(file_getprop /tmp/anykernel/anykernel.sh do.devicecheck)" == 1 ]; then
   ui_print "Checking device...";
@@ -81,7 +107,7 @@ if [ "$(file_getprop /tmp/anykernel/anykernel.sh do.devicecheck)" == 1 ]; then
   fi;
 fi;
 
-ui_print "Installing kernel...";
+ui_print "Patching kernel...";
 for i in $($bb --list); do
   $bb ln -s $bb /tmp/anykernel/bin/$i;
 done;
@@ -96,11 +122,9 @@ fi;
 if [ "$(file_getprop /tmp/anykernel/anykernel.sh do.modules)" == 1 ]; then
   ui_print " ";
   ui_print "Pushing modules...";
-  mount -o rw,remount -t auto /system;
-  $bb cp -rLf /tmp/anykernel/modules/* $root/system/lib/modules/;
-  set_perm_recursive 0 0 0755 0644 $root/system/lib/modules;
-  chcon -R 'u:object_r:system_file:s0' $root/system/lib/modules;
-  mount -o ro,remount -t auto /system;
+  $bb cp -rLf /tmp/anykernel/modules/* /system/lib/modules/;
+  set_perm_recursive 0 0 0755 0644 /system/lib/modules;
+  chcon -R 'u:object_r:system_file:s0' /system/lib/modules;
 fi;
 
 debugging;
@@ -109,7 +133,7 @@ if [ "$(file_getprop /tmp/anykernel/anykernel.sh do.cleanup)" == 1 ]; then
   cleanup;
 fi;
 
-umount /system;
-umount /data 2>/dev/null;
+umount -l /system_root 2>/dev/null
+umount -l /system 2>/dev/null;
 ui_print " ";
 ui_print "Done!";

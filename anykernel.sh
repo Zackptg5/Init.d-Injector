@@ -11,15 +11,6 @@ do.cleanup=1
 do.cleanuponabort=1
 } # end properties
 
-# get install/uninstall action from zip name
-case $(basename $ZIP) in
-  *uninstall*|*Uninstall*|*UNINSTALL*) ACTION=Uninstall;;
-  *) ACTION=Install;;
-esac
-
-# determine install or uninstall
-test -f "/system/etc/initpatch" && ACTION=Uninstall
-
 # shell variables
 # determine the location of the boot partition
 if [ -e /dev/block/platform/*/by-name/boot ]; then
@@ -47,6 +38,9 @@ chown -R root:root $ramdisk/*
 ## AnyKernel install
 dump_boot
 
+# determine install or uninstall
+test -f "initdpatch" && ACTION=Uninstall
+
 # begin ramdisk changes
 
 # other needed functions
@@ -72,9 +66,7 @@ cp_ch() {
 }
 					 
 if [ "$ACTION" == "Install" ]; then
-  ui_print "    Patching init files..."
-  
-  touch /system/etc/initpatch
+  ui_print "Patching init files..."
   
   # remove old broken init.d	
   test -f /system/bin/sysinit && { backup_file /system/bin/sysinit; sed -i -e '\|<FILES>| a\ $SYS/bin/sysinit~' -e '\|<FILES2>| a\ rm -f $SYS/bin/sysinit' $patch/initd.sh; }
@@ -111,7 +103,7 @@ if [ "$ACTION" == "Install" ]; then
   esac
 
   # SEPOLICY PATCHES BY CosmicDan @xda-developers
-  ui_print "    Injecting sepolicy with init.d permissions..."
+  ui_print "Injecting sepolicy with init.d permissions..."
   
   backup_file sepolicy
   sbin/sepolicy-inject -z sysinit -P sepolicy
@@ -136,6 +128,7 @@ if [ "$ACTION" == "Install" ]; then
 else
   rm -f sbin/sysinit
   rm -f sbin/sepolicy-inject
+  rm -f sbin/initdpatch
   restore_file /system/bin/sysinit
   restore_file /system/xbin/sysinit
   restore_file /system/bin/sepolicy-inject
@@ -146,7 +139,6 @@ else
   done
   restore_file sepolicy
   rm -f /system/addon.d/initd.sh
-  rm -f /system/etc/initpatch
 fi
 
 # end ramdisk changes
