@@ -83,6 +83,7 @@ dump_boot() {
     ui_print " "; ui_print "Unpacking ramdisk failed. Aborting..."; exit 1;
   fi;
   cp -af /tmp/anykernel/rdtmp/* $ramdisk;
+  rm -f $ramdisk/placeholder
 }
 
 # repack ramdisk then build and write image

@@ -7,7 +7,6 @@ block=<block>
 
 list_files() {
 cat <<EOF
-etc/initdpatch
 <FILES>
 EOF
 }
