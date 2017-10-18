@@ -64,11 +64,47 @@ cp_ch() {
   chmod 0755 "$2"
   restorecon "$2"
 }
+
+
 					 
 if [ "$ACTION" == "Install" ]; then
-  ui_print "Patching init files..."
+  ABILONG=`grep_prop ro.product.cpu.abi`
   
+  # Search for init.d support
+  INITDPRESENT=$(find . -name 'init*.rc' -type f -exec grep -l 'init.d' {} \;)
+  
+  if [ -z $INITDPRESENT ]; then
+    ui_print "Patching init files..."
+  
+    # remove old broken init.d	
+    test -f /system/bin/sysinit && { backup_file /system/bin/sysinit; sed -i -e '\|<FILES>| a\bin/sysinit~' -e '\|<FILES2>| a\  rm -f $S/bin/sysinit' $patch/initd.sh; }
+    test -f /system/xbin/sysinit && { backup_file /system/xbin/sysinit; sed -i -e '\|<FILES>| a\xbin/sysinit~' -e '\|<FILES2>| a\  rm -f $S/xbin/sysinit' $patch/initd.sh; }
+    test -f /system/bin/sepolicy-inject && { backup_file /system/bin/sepolicy-inject; sed -i -e '\|<FILES>| a\bin/sepolicy-inject~' -e '\|<FILES2>| a\  rm -f $S/bin/sepolicy-inject' $patch/initd.sh; }
+    test -f /system/xbin/sepolicy-inject && { backup_file /system/xbin/sepolicy-inject; sed -i -e '\|<FILES>| a\xbin/sepolicy-inject~' -e '\|<FILES2>| a\  rm -f $S/xbin/sepolicy-inject' $patch/initd.sh; }
+    sed -i -e "s|<block>|$block|" -e "/<FILES>/d" -e "/<FILES2>/d" $patch/initd.sh
+    test -d "/system/addon.d" && cp_ch $patch/initd.sh /system/addon.d/initd.sh				   
+    for FILE in init*.rc; do
+      backup_file $FILE
+      remove_section_mod $FILE "# Run sysinit"
+      remove_line $FILE "start sysinit"
+      remove_section_mod $FILE "# sysinit"
+      remove_section_mod $FILE "service sysinit"
+      remove_section_mod $FILE "# init.d"
+      remove_section_mod $FILE "service userinit"
+    done
+  
+    # add new init.d
+    append_file init.rc "# init.d" init
+    cp_ch $patch/sysinit sbin/sysinit
+    # add indicator file
+    cp -f $patch/initdpatch initdpatch
+  else
+    ui_print "Init.d support already present !"
+    ui_print "Adding missing sepolicy patches..."
+  fi
+
   # detect/copy sepolicy-inject (binaries by xmikos@github)
+  ui_print "Installing sepolicy-inject to /sbin..."
   case $ABILONG in
     arm64*) cp_ch /tmp/anykernel/tools/setools-android/arm64-v8a/sepolicy-inject sbin/sepolicy-inject;;
     armeabi-v7a*) cp_ch /tmp/anykernel/tools/setools-android/armeabi-v7a/sepolicy-inject sbin/sepolicy-inject;;
@@ -79,31 +115,6 @@ if [ "$ACTION" == "Install" ]; then
     mips*) cp_ch /tmp/anykernel/tools/setools-android/mips/sepolicy-inject sbin/sepolicy-inject;;
     *) abort "   ! CPU Type not supported for sepolicy patching! Exiting!";;
   esac
-  
-  # remove old broken init.d	
-  test -f /system/bin/sysinit && { backup_file /system/bin/sysinit; sed -i -e '\|<FILES>| a\bin/sysinit~' -e '\|<FILES2>| a\  rm -f $S/bin/sysinit' $patch/initd.sh; }
-  test -f /system/xbin/sysinit && { backup_file /system/xbin/sysinit; sed -i -e '\|<FILES>| a\xbin/sysinit~' -e '\|<FILES2>| a\  rm -f $S/xbin/sysinit' $patch/initd.sh; }
-  test -f /system/bin/sepolicy-inject && { backup_file /system/bin/sepolicy-inject; sed -i -e '\|<FILES>| a\bin/sepolicy-inject~' -e '\|<FILES2>| a\  rm -f $S/bin/sepolicy-inject' $patch/initd.sh; }
-  test -f /system/xbin/sepolicy-inject && { backup_file /system/xbin/sepolicy-inject; sed -i -e '\|<FILES>| a\xbin/sepolicy-inject~' -e '\|<FILES2>| a\  rm -f $S/xbin/sepolicy-inject' $patch/initd.sh; }
-  sed -i -e "s|<block>|$block|" -e "/<FILES>/d" -e "/<FILES2>/d" $patch/initd.sh
-  test -d "/system/addon.d" && cp_ch $patch/initd.sh /system/addon.d/initd.sh				   
-  for FILE in init*.rc; do
-    backup_file $FILE
-    remove_section_mod $FILE "# Run sysinit"
-    remove_line $FILE "start sysinit"
-    remove_section_mod $FILE "# sysinit"
-    remove_section_mod $FILE "service sysinit"
-    remove_section_mod $FILE "# init.d"
-    remove_section_mod $FILE "service userinit"
-  done
-  
-  # add new init.d
-  append_file init.rc "# init.d" init
-  cp_ch $patch/sysinit sbin/sysinit
-  # add indicator file
-  cp -f $patch/initdpatch initdpatch
-
-  ABILONG=`grep_prop ro.product.cpu.abi`
 
   # SEPOLICY PATCHES BY CosmicDan @xda-developers
   ui_print "Injecting sepolicy with init.d permissions..."
@@ -129,7 +140,7 @@ if [ "$ACTION" == "Install" ]; then
   sbin/sepolicy-inject -s sysinit -t toolbox_exec -c file -p getattr,open,read,ioctl,lock,getattr,execute,execute_no_trans,entrypoint -P sepolicy
 
 else
-  ui_print "Removing init.d patches..."
+  ui_print "Removing init.d patches and sepolicy-inject..."
   rm -f sbin/sysinit sbin/sepolicy-inject initdpatch /system/addon.d/initd.sh
   restore_file /system/bin/sysinit
   restore_file /system/xbin/sysinit
