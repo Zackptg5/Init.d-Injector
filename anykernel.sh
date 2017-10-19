@@ -4,7 +4,7 @@
 ## AnyKernel setup
 # begin properties
 properties() {
-kernel.string=Kernel Audio Modification Library Injector Add-on
+kernel.string=Kernel Init.d Injector Add-on
 do.devicecheck=0
 do.modules=0
 do.cleanup=1
@@ -37,6 +37,7 @@ chown -R root:root $ramdisk/*
 
 ## AnyKernel install
 ui_print "Unpacking boot image..."
+ui_print " "
 dump_boot
 
 # determine install or uninstall
@@ -99,7 +100,7 @@ if [ "$ACTION" == "Install" ]; then
     cp -f $patch/initdpatch initdpatch
   else
     ui_print "Init.d support already present !"
-    ui_print "Adding missing sepolicy patches..."
+	ui_print " "
   fi
 
   # detect/copy sepolicy-inject (binaries by xmikos@github)
@@ -112,7 +113,7 @@ if [ "$ACTION" == "Install" ]; then
     x86*) cp_ch /tmp/anykernel/tools/setools-android/x86/sepolicy-inject sbin/sepolicy-inject;;
     mips64*) cp_ch /tmp/anykernel/tools/setools-android/mips64/sepolicy-inject sbin/sepolicy-inject;;
     mips*) cp_ch /tmp/anykernel/tools/setools-android/mips/sepolicy-inject sbin/sepolicy-inject;;
-    *) abort "   ! CPU Type not supported for sepolicy patching! Exiting!";;
+    *) ui_print " "; abort " ! CPU Type not supported for sepolicy patching! Exiting!";;
   esac
 
   # SEPOLICY PATCHES BY CosmicDan @xda-developers
