@@ -2,7 +2,6 @@
 # Backups and restores boot (kernel) parition - credits to Osm0sis @xda-developers
 
 . /tmp/backuptool.functions
-MODID=audmodlib
 block=<block>
 
 list_files() {
