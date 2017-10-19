@@ -24,16 +24,38 @@ block=`echo -n $block`;
 # enables detection of the suffix for the active boot partition on slot-based devices
 is_slot_device=0;
 
-
 ## AnyKernel methods (DO NOT CHANGE)
 # import patching functions/variables - see for reference
 . /tmp/anykernel/tools/ak2-core.sh
-
 
 ## AnyKernel file attributes
 # set permissions/ownership for included ramdisk files
 chmod -R 750 $ramdisk/*
 chown -R root:root $ramdisk/*
+
+# Detect if LG bump devicecheck (credits to topjohnwu and Drgravy @xda-developers
+LGE_G=false
+RBRAND=$(grep_prop ro.product.brand)
+RMODEL=$(grep_prop ro.product.device)
+if [ "$RBRAND" = "lge" ] || [ "$RBRAND" = "LGE" ];  then 
+  if [ "$RMODEL" = "d800" ] ||
+     [ "$RMODEL" = "d801" ] ||
+     [ "$RMODEL" = "d802" ] ||
+     [ "$RMODEL" = "d803" ] || 
+     [ "$RMODEL" = "ls980" ] ||
+     [ "$RMODEL" = "vs980" ] ||
+     [ "$RMODEL" = "l01f" ] || 
+     [ "$RMODEL" = "d850" ] ||
+     [ "$RMODEL" = "d852" ] ||
+     [ "$RMODEL" = "d855" ] ||
+     [ "$RMODEL" = "ls990" ] ||
+     [ "$RMODEL" = "vs985" ] ||
+     [ "$RMODEL" = "f400" ]; then
+    LGE_G=true
+    ui_print "! Bump device detected !"
+	ui_print " "
+  fi
+fi
 
 ## AnyKernel install
 ui_print "Unpacking boot image..."
@@ -44,28 +66,6 @@ dump_boot
 test -f "initdpatch" && ACTION=Uninstall || ACTION=Install
 
 # begin ramdisk changes
-
-# other needed functions
-remove_section_mod() {
-  sed -i "/${2//\//\\/}/,/^$/d" $1
-}
-
-# restore_file <file>
-restore_file() { test -f $1~ && mv -f $1~ $1; }
-
-grep_prop() {
-  REGEX="s/^$1=//p"
-  shift
-  FILES=$@
-  [ -z "$FILES" ] && FILES='/system/build.prop'
-  sed -n "$REGEX" $FILES 2>/dev/null | head -n 1
-}
-
-cp_ch() {
-  cp -af "$1" "$2"
-  chmod 0755 "$2"
-  restorecon "$2"
-}
 					 
 if [ "$ACTION" == "Install" ]; then
   ABILONG=`grep_prop ro.product.cpu.abi`

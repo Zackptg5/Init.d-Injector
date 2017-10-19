@@ -193,13 +193,6 @@ write_boot() {
     mv -f boot-new-signed.img boot-new.img;
   fi;
   if [ -f "$bin/BootSignature_Android.jar" -a -d "$bin/avb" ]; then
-    if [ -f "/system/system/bin/dalvikvm" ]; then
-      umount /system;
-      umount /system 2>/dev/null;
-      mkdir /system_root;
-      mount -o ro -t auto /dev/block/bootdevice/by-name/system$slot /system_root;
-      mount -o bind /system_root/system /system;
-    fi;
     unset LD_LIBRARY_PATH;
     pk8=`ls $bin/avb/*.pk8`;
     cert=`ls $bin/avb/*.x509.*`;
@@ -208,12 +201,6 @@ write_boot() {
       ui_print " "; ui_print "Signing image failed. Aborting..."; exit 1;
     fi;
     mv -f boot-new-signed.img boot-new.img;
-    if [ -d "/system_root" ]; then
-      umount /system;
-      umount /system_root;
-      rmdir /system_root;
-      mount -o ro -t auto /system;
-    fi;
   fi;
   if [ -f "$bin/blobpack" ]; then
     printf '-SIGNED-BY-SIGNBLOB-\00\00\00\00\00\00\00\00' > boot-new-signed.img;
@@ -229,6 +216,11 @@ write_boot() {
   fi;
   if [ "$(strings /tmp/anykernel/boot.img | grep SEANDROIDENFORCE )" ]; then
     printf 'SEANDROIDENFORCE' >> boot-new.img;
+  fi;
+  if ($LGE_G); then
+    # Prevent secure boot error on LG G2/G3.
+    # Just for know, It's a pattern which bootloader verifies at boot. Thanks to LG hackers.
+    echo -n -e "\x41\xa9\xe4\x67\x74\x4d\x1d\x1b\xa4\x29\xf2\xec\xea\x65\x52\x79" >> boot-new.img;
   fi;
   if [ -f "$bin/dhtbsign" ]; then
     $bin/dhtbsign -i boot-new.img -o boot-new-signed.img;
@@ -249,6 +241,9 @@ write_boot() {
 
 # backup_file <file>
 backup_file() { test ! -f $1~ && cp $1 $1~; }
+
+# restore_file <file>
+restore_file() { test -f $1~ && mv -f $1~ $1; }
 
 # replace_string <file> <if search string> <original string> <replacement string>
 replace_string() {
@@ -394,6 +389,20 @@ patch_prop() {
   fi;
 }
 
+grep_prop() {
+  REGEX="s/^$1=//p"
+  shift
+  FILES=$@
+  [ -z "$FILES" ] && FILES='/system/build.prop'
+  sed -n "$REGEX" $FILES 2>/dev/null | head -n 1
+}
+
+cp_ch() {
+  cp -af "$1" "$2"
+  chmod 0755 "$2"
+  restorecon "$2"
+}
+
 # slot detection enabled by is_slot_device=1 (from anykernel.sh)
 if [ "$is_slot_device" == 1 ]; then
   slot=$(getprop ro.boot.slot_suffix 2>/dev/null);
@@ -405,4 +414,3 @@ if [ "$is_slot_device" == 1 ]; then
 fi;
 
 ## end methods
-
