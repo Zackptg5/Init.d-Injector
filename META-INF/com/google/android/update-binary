@@ -72,7 +72,7 @@ mount_system() {
   ui_print " "
 }
 
-show_progress 1.34 4;
+#show_progress 1.34 4;
 ui_print " ";
 cleanup;
 mkdir -p /tmp/anykernel/bin;

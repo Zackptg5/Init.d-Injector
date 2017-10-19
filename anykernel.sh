@@ -4,7 +4,7 @@
 ## AnyKernel setup
 # begin properties
 properties() {
-kernel.string=Kernel Init.d Injector Add-on
+kernel.string=Kernel Init.d Injector
 do.devicecheck=0
 do.modules=0
 do.cleanup=1
@@ -57,6 +57,20 @@ if [ "$RBRAND" = "lge" ] || [ "$RBRAND" = "LGE" ];  then
   fi
 fi
 
+ABILONG=`grep_prop ro.product.cpu.abi`
+
+# detect setools (binaries by xmikos @github)
+  case $ABILONG in
+    arm64*) SETOOLS=/tmp/anykernel/tools/setools-android/arm64-v8a;;
+    armeabi-v7a*) SETOOLS=/tmp/anykernel/tools/setools-android/armeabi-v7a;;
+    arm*) SETOOLS=/tmp/anykernel/tools/setools-android/armeabi;;
+    x86_64*) SETOOLS=/tmp/anykernel/tools/setools-android/x86_64;;
+    x86*) SETOOLS=/tmp/anykernel/tools/setools-android/x86;;
+    mips64*) SETOOLS=/tmp/anykernel/tools/setools-android/mips64;;
+    mips*) SETOOLS=/tmp/anykernel/tools/setools-android/mips;;
+    *) ui_print " "; abort " ! CPU Type not supported for sepolicy patching! Exiting!";;
+  esac
+
 ## AnyKernel install
 ui_print "Unpacking boot image..."
 ui_print " "
@@ -66,13 +80,14 @@ dump_boot
 test -f "initdpatch" && ACTION=Uninstall || ACTION=Install
 
 # begin ramdisk changes
-					 
+replace_and_patch() {
+  test -f $1 && { backup_file $1; rm -f $1; sed -i -e "\|<FILES>| a\$1~" -e "\|<FILES2>| a\  rm -f $1" -e "s|rm -f /system|rm -f $S|g" $patch/initd.sh; }
+}
+
 if [ "$ACTION" == "Install" ]; then
-  ABILONG=`grep_prop ro.product.cpu.abi`
-  
-  # add indicator file
+  # Add indicator file
   touch initdpatch
-  
+
   # Search for init.d support
   [ "$(find . -name 'init*.rc' -type f -exec grep -l 'init.d' {} \;)" ] && ui_print "Init files already patched!" || { ui_print "Patching init files..."; backup_file init.rc; append_file init.rc "# init.d" init; }
   
@@ -80,8 +95,12 @@ if [ "$ACTION" == "Install" ]; then
   ui_print "Replacing sysinit..."
   test -f /system/bin/sysinit && { backup_file /system/bin/sysinit; sed -i -e '\|<FILES>| a\bin/sysinit' -e '\|<FILES>| a\bin/sysinit~' $patch/initd.sh; }
   test -f /system/xbin/sysinit && { backup_file /system/xbin/sysinit; sed -i -e '\|<FILES>| a\xbin/sysinit' -e '\|<FILES>| a\xbin/sysinit~' $patch/initd.sh; }
-  test -f /system/bin/sepolicy-inject && { backup_file /system/bin/sepolicy-inject; sed -i -e '\|<FILES>| a\bin/sepolicy-inject~' -e '\|<FILES2>| a\  rm -f $S/bin/sepolicy-inject' $patch/initd.sh; }
-  test -f /system/xbin/sepolicy-inject && { backup_file /system/xbin/sepolicy-inject; sed -i -e '\|<FILES>| a\xbin/sepolicy-inject~' -e '\|<FILES2>| a\  rm -f $S/xbin/sepolicy-inject' $patch/initd.sh; }
+  replace_and_patch /system/bin/sepolicy-inject
+  replace_and_patch /system/xbin/sepolicy-inject
+  replace_and_patch /system/bin/seinfo
+  replace_and_patch /system/xbin/seinfo
+  replace_and_patch /system/bin/sesearch
+  replace_and_patch /system/xbin/sesearch
   cp -f $patch/sysinit /system/bin/sysinit
   chmod 0755 /system/bin/sysinit
 
@@ -89,46 +108,37 @@ if [ "$ACTION" == "Install" ]; then
   sed -i -e "s|<block>|$block|" -e "/<FILES>/d" -e "/<FILES2>/d" $patch/initd.sh
   test -d "/system/addon.d" && { ui_print "Installing addon.d script..."; cp -f $patch/initd.sh /system/addon.d/99initd.sh; chmod 0755 /system/addon.d/99initd.sh; } || { ui_print "No addon.d support detected!"; "Patched boot img won't survive dirty flash!"; }
 
-  # detect/copy setools (binaries by xmikos @github)
+  # copy setools
   ui_print "Installing setools to /sbin..."
-  case $ABILONG in
-    arm64*) cp -f /tmp/anykernel/tools/setools-android/arm64-v8a/* sbin;;
-    armeabi-v7a*) cp -f /tmp/anykernel/tools/setools-android/armeabi-v7a/* sbin;;
-    arm*) cp -f /tmp/anykernel/tools/setools-android/armeabi/* sbin;;
-    x86_64*) cp -f /tmp/anykernel/tools/setools-android/x86_64/* sbin;;
-    x86*) cp -f /tmp/anykernel/tools/setools-android/x86/* sbin;;
-    mips64*) cp -f /tmp/anykernel/tools/setools-android/mips64/* sbin;;
-    mips*) cp -f /tmp/anykernel/tools/setools-android/mips/* sbin;;
-    *) ui_print " "; abort " ! CPU Type not supported for sepolicy patching! Exiting!";;
-  esac
+  cp -f $SETOOLS/* sbin
   chmod 0755 sbin/*
 
   # sepolicy patches by CosmicDan @xda-developers
   ui_print "Injecting sepolicy with init.d permissions..."
   
   backup_file sepolicy
-  sbin/sepolicy-inject -z sysinit -P sepolicy
-  sbin/sepolicy-inject -Z sysinit -P sepolicy
-  sbin/sepolicy-inject -s init -t sysinit -c process -p transition -P sepolicy
-  sbin/sepolicy-inject -s init -t sysinit -c process -p rlimitinh -P sepolicy
-  sbin/sepolicy-inject -s init -t sysinit -c process -p siginh -P sepolicy
-  sbin/sepolicy-inject -s init -t sysinit -c process -p noatsecure -P sepolicy
-  sbin/sepolicy-inject -s sysinit -t sysinit -c dir -p search,read -P sepolicy
-  sbin/sepolicy-inject -s sysinit -t sysinit -c file -p read,write,open -P sepolicy
-  sbin/sepolicy-inject -s sysinit -t sysinit -c unix_dgram_socket -p create,connect,write,setopt -P sepolicy
-  sbin/sepolicy-inject -s sysinit -t sysinit -c lnk_file -p read -P sepolicy
-  sbin/sepolicy-inject -s sysinit -t sysinit -c process -p fork,sigchld -P sepolicy
-  sbin/sepolicy-inject -s sysinit -t sysinit -c capability -p dac_override -P sepolicy
-  sbin/sepolicy-inject -s sysinit -t system_file -c file -p entrypoint,execute_no_trans -P sepolicy
-  sbin/sepolicy-inject -s sysinit -t devpts -c chr_file -p read,write,open,getattr,ioctl -P sepolicy
-  sbin/sepolicy-inject -s sysinit -t rootfs -c file -p execute,read,open,execute_no_trans,getattr -P sepolicy
-  sbin/sepolicy-inject -s sysinit -t shell_exec -c file -p execute,read,open,execute_no_trans,getattr -P sepolicy
-  sbin/sepolicy-inject -s sysinit -t zygote_exec -c file -p execute,read,open,execute_no_trans,getattr -P sepolicy
-  sbin/sepolicy-inject -s sysinit -t toolbox_exec -c file -p getattr,open,read,ioctl,lock,getattr,execute,execute_no_trans,entrypoint -P sepolicy
+  $SETOOLS/sepolicy-inject -z sysinit -P sepolicy
+  $SETOOLS/sepolicy-inject -Z sysinit -P sepolicy
+  $SETOOLS/sepolicy-inject -s init -t sysinit -c process -p transition -P sepolicy
+  $SETOOLS/sepolicy-inject -s init -t sysinit -c process -p rlimitinh -P sepolicy
+  $SETOOLS/sepolicy-inject -s init -t sysinit -c process -p siginh -P sepolicy
+  $SETOOLS/sepolicy-inject -s init -t sysinit -c process -p noatsecure -P sepolicy
+  $SETOOLS/sepolicy-inject -s sysinit -t sysinit -c dir -p search,read -P sepolicy
+  $SETOOLS/sepolicy-inject -s sysinit -t sysinit -c file -p read,write,open -P sepolicy
+  $SETOOLS/sepolicy-inject -s sysinit -t sysinit -c unix_dgram_socket -p create,connect,write,setopt -P sepolicy
+  $SETOOLS/sepolicy-inject -s sysinit -t sysinit -c lnk_file -p read -P sepolicy
+  $SETOOLS/sepolicy-inject -s sysinit -t sysinit -c process -p fork,sigchld -P sepolicy
+  $SETOOLS/sepolicy-inject -s sysinit -t sysinit -c capability -p dac_override -P sepolicy
+  $SETOOLS/sepolicy-inject -s sysinit -t system_file -c file -p entrypoint,execute_no_trans -P sepolicy
+  $SETOOLS/sepolicy-inject -s sysinit -t devpts -c chr_file -p read,write,open,getattr,ioctl -P sepolicy
+  $SETOOLS/sepolicy-inject -s sysinit -t rootfs -c file -p execute,read,open,execute_no_trans,getattr -P sepolicy
+  $SETOOLS/sepolicy-inject -s sysinit -t shell_exec -c file -p execute,read,open,execute_no_trans,getattr -P sepolicy
+  $SETOOLS/sepolicy-inject -s sysinit -t zygote_exec -c file -p execute,read,open,execute_no_trans,getattr -P sepolicy
+  $SETOOLS/sepolicy-inject -s sysinit -t toolbox_exec -c file -p getattr,open,read,ioctl,lock,getattr,execute,execute_no_trans,entrypoint -P sepolicy
 
 else
   ui_print "Removing init.d patches and sepolicy-inject..."
-  rm -f sbin/sepolicy-inject initdpatch /system/addon.d/99initd.sh
+  rm -f sbin/sepolicy-inject sbin/sesearch sbin/seinfo /system/addon.d/99initd.sh
   restore_file /system/bin/sysinit
   restore_file /system/xbin/sysinit
   restore_file /system/bin/sepolicy-inject
