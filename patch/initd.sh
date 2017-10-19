@@ -37,8 +37,8 @@ case "$1" in
     # Stub
   ;;
   post-restore)
-   <FILES2>
-   # wait out ROM kernel flash then restore custom kernel
+    <FILES2>
+    # wait out ROM kernel flash then restore custom kernel
     while sleep 5; do
       [ -e /tmp/boot.img -a -e "$block" ] && dd if=/tmp/boot.img of=$block
       exit

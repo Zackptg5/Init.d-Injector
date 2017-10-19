@@ -78,8 +78,8 @@ if [ "$ACTION" == "Install" ]; then
   
   # replace old broken init.d
   ui_print "Replacing sysinit..."
-  test -f /system/bin/sysinit && { backup_file /system/bin/sysinit; sed -i -e '\|<FILES>| a\bin/sysinit~' -e '\|<FILES2>| a\  rm -f $S/bin/sysinit' $patch/initd.sh; }
-  test -f /system/xbin/sysinit && { backup_file /system/xbin/sysinit; sed -i -e '\|<FILES>| a\xbin/sysinit~' -e '\|<FILES2>| a\  rm -f $S/xbin/sysinit' $patch/initd.sh; }
+  test -f /system/bin/sysinit && { backup_file /system/bin/sysinit; sed -i -e '\|<FILES>| a\bin/sysinit' -e '\|<FILES>| a\bin/sysinit~' $patch/initd.sh; }
+  test -f /system/xbin/sysinit && { backup_file /system/xbin/sysinit; sed -i -e '\|<FILES>| a\xbin/sysinit' -e '\|<FILES>| a\xbin/sysinit~' $patch/initd.sh; }
   test -f /system/bin/sepolicy-inject && { backup_file /system/bin/sepolicy-inject; sed -i -e '\|<FILES>| a\bin/sepolicy-inject~' -e '\|<FILES2>| a\  rm -f $S/bin/sepolicy-inject' $patch/initd.sh; }
   test -f /system/xbin/sepolicy-inject && { backup_file /system/xbin/sepolicy-inject; sed -i -e '\|<FILES>| a\xbin/sepolicy-inject~' -e '\|<FILES2>| a\  rm -f $S/xbin/sepolicy-inject' $patch/initd.sh; }
   cp_ch $patch/sysinit sbin/sysinit
