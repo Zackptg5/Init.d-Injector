@@ -397,12 +397,6 @@ grep_prop() {
   sed -n "$REGEX" $FILES 2>/dev/null | head -n 1
 }
 
-cp_ch() {
-  cp -af "$1" "$2"
-  chmod 0755 "$2"
-  restorecon "$2"
-}
-
 # slot detection enabled by is_slot_device=1 (from anykernel.sh)
 if [ "$is_slot_device" == 1 ]; then
   slot=$(getprop ro.boot.slot_suffix 2>/dev/null);

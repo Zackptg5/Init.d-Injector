@@ -82,26 +82,28 @@ if [ "$ACTION" == "Install" ]; then
   test -f /system/xbin/sysinit && { backup_file /system/xbin/sysinit; sed -i -e '\|<FILES>| a\xbin/sysinit' -e '\|<FILES>| a\xbin/sysinit~' $patch/initd.sh; }
   test -f /system/bin/sepolicy-inject && { backup_file /system/bin/sepolicy-inject; sed -i -e '\|<FILES>| a\bin/sepolicy-inject~' -e '\|<FILES2>| a\  rm -f $S/bin/sepolicy-inject' $patch/initd.sh; }
   test -f /system/xbin/sepolicy-inject && { backup_file /system/xbin/sepolicy-inject; sed -i -e '\|<FILES>| a\xbin/sepolicy-inject~' -e '\|<FILES2>| a\  rm -f $S/xbin/sepolicy-inject' $patch/initd.sh; }
-  cp_ch $patch/sysinit /system/bin/sysinit
+  cp -f $patch/sysinit /system/bin/sysinit
+  chmod 0755 /system/bin/sysinit
 
   # Add backup script
   sed -i -e "s|<block>|$block|" -e "/<FILES>/d" -e "/<FILES2>/d" $patch/initd.sh
-  test -d "/system/addon.d" && { ui_print "Installing addon.d script..."; cp_ch $patch/initd.sh /system/addon.d/99initd.sh; } || { ui_print "No addon.d support detected!"; "Patched boot img won't survive dirty flash!"; }
+  test -d "/system/addon.d" && { ui_print "Installing addon.d script..."; cp -f $patch/initd.sh /system/addon.d/99initd.sh; chmod 0755 /system/addon.d/99initd.sh; } || { ui_print "No addon.d support detected!"; "Patched boot img won't survive dirty flash!"; }
 
-  # detect/copy sepolicy-inject (binaries by xmikos@github)
-  ui_print "Installing sepolicy-inject to /sbin..."
+  # detect/copy setools (binaries by xmikos @github)
+  ui_print "Installing setools to /sbin..."
   case $ABILONG in
-    arm64*) cp_ch /tmp/anykernel/tools/setools-android/arm64-v8a/sepolicy-inject sbin/sepolicy-inject;;
-    armeabi-v7a*) cp_ch /tmp/anykernel/tools/setools-android/armeabi-v7a/sepolicy-inject sbin/sepolicy-inject;;
-    arm*) cp_ch /tmp/anykernel/tools/setools-android/armeabi/sepolicy-inject sbin/sepolicy-inject;;
-    x86_64*) cp_ch /tmp/anykernel/tools/setools-android/x86_64/sepolicy-inject sbin/sepolicy-inject;;
-    x86*) cp_ch /tmp/anykernel/tools/setools-android/x86/sepolicy-inject sbin/sepolicy-inject;;
-    mips64*) cp_ch /tmp/anykernel/tools/setools-android/mips64/sepolicy-inject sbin/sepolicy-inject;;
-    mips*) cp_ch /tmp/anykernel/tools/setools-android/mips/sepolicy-inject sbin/sepolicy-inject;;
+    arm64*) cp -f /tmp/anykernel/tools/setools-android/arm64-v8a/* sbin;;
+    armeabi-v7a*) cp -f /tmp/anykernel/tools/setools-android/armeabi-v7a/* sbin;;
+    arm*) cp -f /tmp/anykernel/tools/setools-android/armeabi/* sbin;;
+    x86_64*) cp -f /tmp/anykernel/tools/setools-android/x86_64/* sbin;;
+    x86*) cp -f /tmp/anykernel/tools/setools-android/x86/* sbin;;
+    mips64*) cp -f /tmp/anykernel/tools/setools-android/mips64/* sbin;;
+    mips*) cp -f /tmp/anykernel/tools/setools-android/mips/* sbin;;
     *) ui_print " "; abort " ! CPU Type not supported for sepolicy patching! Exiting!";;
   esac
+  chmod 0755 sbin/*
 
-  # SEPOLICY PATCHES BY CosmicDan @xda-developers
+  # sepolicy patches by CosmicDan @xda-developers
   ui_print "Injecting sepolicy with init.d permissions..."
   
   backup_file sepolicy
