@@ -36,6 +36,7 @@ chmod -R 750 $ramdisk/*
 chown -R root:root $ramdisk/*
 
 ## AnyKernel install
+ui_print "Unpacking boot image..."
 dump_boot
 
 # determine install or uninstall
@@ -156,7 +157,7 @@ else
 fi
 
 # end ramdisk changes
-
+ui_print "Repacking boot image..."
 write_boot
 
 ## end install
