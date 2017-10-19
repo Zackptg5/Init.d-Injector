@@ -74,7 +74,7 @@ if [ "$ACTION" == "Install" ]; then
   touch initdpatch
   
   # Search for init.d support
-  [ "$(find . -name 'init*.rc' -type f -exec grep -l 'init.d' {} \;)" ] && ui_print "Init files already patched!" || { ui_print "Patching init files..."; append_file init.rc "# init.d" init; }
+  [ "$(find . -name 'init*.rc' -type f -exec grep -l 'init.d' {} \;)" ] && ui_print "Init files already patched!" || { ui_print "Patching init files..."; backup_file init.rc; append_file init.rc "# init.d" init; }
   
   # replace old broken init.d
   ui_print "Replacing sysinit..."
