@@ -66,42 +66,27 @@ cp_ch() {
   chmod 0755 "$2"
   restorecon "$2"
 }
-
-
 					 
 if [ "$ACTION" == "Install" ]; then
   ABILONG=`grep_prop ro.product.cpu.abi`
   
+  # add indicator file
+  cp -f $patch/initdpatch initdpatch
+  
   # Search for init.d support
-  INITDPRESENT=$(find . -name 'init*.rc' -type f -exec grep -l 'init.d' {} \;)
+  test "$(find . -name 'init*.rc' -type f -exec grep -l 'init.d' {} \;)" && { ui_print "Patching init files..."; append_file init.rc "# init.d" init; } || ui_print "Init files already patched!"
   
-  if [ -z $INITDPRESENT ]; then
-    ui_print "Patching init files..."
-  
-    # remove old broken init.d	
-    test -f /system/bin/sysinit && { backup_file /system/bin/sysinit; sed -i -e '\|<FILES>| a\bin/sysinit~' -e '\|<FILES2>| a\  rm -f $S/bin/sysinit' $patch/initd.sh; }
-    test -f /system/xbin/sysinit && { backup_file /system/xbin/sysinit; sed -i -e '\|<FILES>| a\xbin/sysinit~' -e '\|<FILES2>| a\  rm -f $S/xbin/sysinit' $patch/initd.sh; }
-    test -f /system/bin/sepolicy-inject && { backup_file /system/bin/sepolicy-inject; sed -i -e '\|<FILES>| a\bin/sepolicy-inject~' -e '\|<FILES2>| a\  rm -f $S/bin/sepolicy-inject' $patch/initd.sh; }
-    test -f /system/xbin/sepolicy-inject && { backup_file /system/xbin/sepolicy-inject; sed -i -e '\|<FILES>| a\xbin/sepolicy-inject~' -e '\|<FILES2>| a\  rm -f $S/xbin/sepolicy-inject' $patch/initd.sh; }				   
-    for FILE in init*.rc; do
-      backup_file $FILE
-      remove_section_mod $FILE "# Run sysinit"
-      remove_line $FILE "start sysinit"
-      remove_section_mod $FILE "# sysinit"
-      remove_section_mod $FILE "service sysinit"
-      remove_section_mod $FILE "# init.d"
-      remove_section_mod $FILE "service userinit"
-    done
-  
-    # add new init.d
-    append_file init.rc "# init.d" init
-    cp_ch $patch/sysinit sbin/sysinit
-    # add indicator file
-    cp -f $patch/initdpatch initdpatch
-  else
-    ui_print "Init.d support already present !"
-	ui_print " "
-  fi
+  # replace old broken init.d
+  ui_print "Replacing sysinit..."
+  test -f /system/bin/sysinit && { backup_file /system/bin/sysinit; sed -i -e '\|<FILES>| a\bin/sysinit~' -e '\|<FILES2>| a\  rm -f $S/bin/sysinit' $patch/initd.sh; }
+  test -f /system/xbin/sysinit && { backup_file /system/xbin/sysinit; sed -i -e '\|<FILES>| a\xbin/sysinit~' -e '\|<FILES2>| a\  rm -f $S/xbin/sysinit' $patch/initd.sh; }
+  test -f /system/bin/sepolicy-inject && { backup_file /system/bin/sepolicy-inject; sed -i -e '\|<FILES>| a\bin/sepolicy-inject~' -e '\|<FILES2>| a\  rm -f $S/bin/sepolicy-inject' $patch/initd.sh; }
+  test -f /system/xbin/sepolicy-inject && { backup_file /system/xbin/sepolicy-inject; sed -i -e '\|<FILES>| a\xbin/sepolicy-inject~' -e '\|<FILES2>| a\  rm -f $S/xbin/sepolicy-inject' $patch/initd.sh; }
+  cp_ch $patch/sysinit sbin/sysinit
+
+  # Add backup script
+  sed -i -e "s|<block>|$block|" -e "/<FILES>/d" -e "/<FILES2>/d" $patch/initd.sh
+  test -d "/system/addon.d" && { ui_print "Installing addon.d script..."; cp_ch $patch/initd.sh /system/addon.d/99initd.sh; } || { ui_print "No addon.d support detected!"; "Patched boot img won't survive dirty flash!"; }
 
   # detect/copy sepolicy-inject (binaries by xmikos@github)
   ui_print "Installing sepolicy-inject to /sbin..."
@@ -138,10 +123,6 @@ if [ "$ACTION" == "Install" ]; then
   sbin/sepolicy-inject -s sysinit -t shell_exec -c file -p execute,read,open,execute_no_trans,getattr -P sepolicy
   sbin/sepolicy-inject -s sysinit -t zygote_exec -c file -p execute,read,open,execute_no_trans,getattr -P sepolicy
   sbin/sepolicy-inject -s sysinit -t toolbox_exec -c file -p getattr,open,read,ioctl,lock,getattr,execute,execute_no_trans,entrypoint -P sepolicy
-  
-  # Add backup script
-  sed -i -e "s|<block>|$block|" -e "/<FILES>/d" -e "/<FILES2>/d" $patch/initd.sh
-  test -d "/system/addon.d" && { ui_print "Installing addon.d script..."; cp_ch $patch/initd.sh /system/addon.d/99initd.sh; } || { ui_print "No addon.d support detected!"; "Patched boot img won't survive dirty flash!"; }
 
 else
   ui_print "Removing init.d patches and sepolicy-inject..."
@@ -150,16 +131,13 @@ else
   restore_file /system/xbin/sysinit
   restore_file /system/bin/sepolicy-inject
   restore_file /system/xbin/sepolicy-inject
-  # restore all .rc files
-  for FILE in init*.rc; do
-    restore_file $FILE
-  done
+  restore_file init.rc
   restore_file sepolicy
 fi
 
 # end ramdisk changes
+ui_print " "
 ui_print "Repacking boot image..."
 write_boot
 
 ## end install
-
