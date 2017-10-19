@@ -80,9 +80,7 @@ if [ "$ACTION" == "Install" ]; then
     test -f /system/bin/sysinit && { backup_file /system/bin/sysinit; sed -i -e '\|<FILES>| a\bin/sysinit~' -e '\|<FILES2>| a\  rm -f $S/bin/sysinit' $patch/initd.sh; }
     test -f /system/xbin/sysinit && { backup_file /system/xbin/sysinit; sed -i -e '\|<FILES>| a\xbin/sysinit~' -e '\|<FILES2>| a\  rm -f $S/xbin/sysinit' $patch/initd.sh; }
     test -f /system/bin/sepolicy-inject && { backup_file /system/bin/sepolicy-inject; sed -i -e '\|<FILES>| a\bin/sepolicy-inject~' -e '\|<FILES2>| a\  rm -f $S/bin/sepolicy-inject' $patch/initd.sh; }
-    test -f /system/xbin/sepolicy-inject && { backup_file /system/xbin/sepolicy-inject; sed -i -e '\|<FILES>| a\xbin/sepolicy-inject~' -e '\|<FILES2>| a\  rm -f $S/xbin/sepolicy-inject' $patch/initd.sh; }
-    sed -i -e "s|<block>|$block|" -e "/<FILES>/d" -e "/<FILES2>/d" $patch/initd.sh
-    test -d "/system/addon.d" && cp_ch $patch/initd.sh /system/addon.d/initd.sh				   
+    test -f /system/xbin/sepolicy-inject && { backup_file /system/xbin/sepolicy-inject; sed -i -e '\|<FILES>| a\xbin/sepolicy-inject~' -e '\|<FILES2>| a\  rm -f $S/xbin/sepolicy-inject' $patch/initd.sh; }				   
     for FILE in init*.rc; do
       backup_file $FILE
       remove_section_mod $FILE "# Run sysinit"
@@ -138,10 +136,14 @@ if [ "$ACTION" == "Install" ]; then
   sbin/sepolicy-inject -s sysinit -t shell_exec -c file -p execute,read,open,execute_no_trans,getattr -P sepolicy
   sbin/sepolicy-inject -s sysinit -t zygote_exec -c file -p execute,read,open,execute_no_trans,getattr -P sepolicy
   sbin/sepolicy-inject -s sysinit -t toolbox_exec -c file -p getattr,open,read,ioctl,lock,getattr,execute,execute_no_trans,entrypoint -P sepolicy
+  
+  # Add backup script
+  sed -i -e "s|<block>|$block|" -e "/<FILES>/d" -e "/<FILES2>/d" $patch/initd.sh
+  test -d "/system/addon.d" && { ui_print "Installing addon.d script..."; cp_ch $patch/initd.sh /system/addon.d/99initd.sh; } || { ui_print "No addon.d support detected!"; "Patched boot img won't survive dirty flash!"; }
 
 else
   ui_print "Removing init.d patches and sepolicy-inject..."
-  rm -f sbin/sysinit sbin/sepolicy-inject initdpatch /system/addon.d/initd.sh
+  rm -f sbin/sysinit sbin/sepolicy-inject initdpatch /system/addon.d/99initd.sh
   restore_file /system/bin/sysinit
   restore_file /system/xbin/sysinit
   restore_file /system/bin/sepolicy-inject
