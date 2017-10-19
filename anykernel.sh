@@ -126,7 +126,7 @@ if [ "$ACTION" == "Install" ]; then
 
 else
   ui_print "Removing init.d patches and sepolicy-inject..."
-  rm -f sbin/sysinit sbin/sepolicy-inject initdpatch /system/addon.d/99initd.sh
+  rm -f sbin/sepolicy-inject initdpatch /system/addon.d/99initd.sh
   restore_file /system/bin/sysinit
   restore_file /system/xbin/sysinit
   restore_file /system/bin/sepolicy-inject
