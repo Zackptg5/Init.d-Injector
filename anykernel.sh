@@ -71,10 +71,10 @@ if [ "$ACTION" == "Install" ]; then
   ABILONG=`grep_prop ro.product.cpu.abi`
   
   # add indicator file
-  cp -f $patch/initdpatch initdpatch
+  touch initdpatch
   
   # Search for init.d support
-  test "$(find . -name 'init*.rc' -type f -exec grep -l 'init.d' {} \;)" && { ui_print "Patching init files..."; append_file init.rc "# init.d" init; } || ui_print "Init files already patched!"
+  [ "$(find . -name 'init*.rc' -type f -exec grep -l 'init.d' {} \;)" ] && ui_print "Init files already patched!" || { ui_print "Patching init files..."; append_file init.rc "# init.d" init; }
   
   # replace old broken init.d
   ui_print "Replacing sysinit..."
@@ -82,7 +82,7 @@ if [ "$ACTION" == "Install" ]; then
   test -f /system/xbin/sysinit && { backup_file /system/xbin/sysinit; sed -i -e '\|<FILES>| a\xbin/sysinit' -e '\|<FILES>| a\xbin/sysinit~' $patch/initd.sh; }
   test -f /system/bin/sepolicy-inject && { backup_file /system/bin/sepolicy-inject; sed -i -e '\|<FILES>| a\bin/sepolicy-inject~' -e '\|<FILES2>| a\  rm -f $S/bin/sepolicy-inject' $patch/initd.sh; }
   test -f /system/xbin/sepolicy-inject && { backup_file /system/xbin/sepolicy-inject; sed -i -e '\|<FILES>| a\xbin/sepolicy-inject~' -e '\|<FILES2>| a\  rm -f $S/xbin/sepolicy-inject' $patch/initd.sh; }
-  cp_ch $patch/sysinit sbin/sysinit
+  cp_ch $patch/sysinit /system/bin/sysinit
 
   # Add backup script
   sed -i -e "s|<block>|$block|" -e "/<FILES>/d" -e "/<FILES2>/d" $patch/initd.sh

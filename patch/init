@@ -2,7 +2,7 @@
 on property:sys.boot_completed=1
     start sysinit
 
-service sysinit /system/bin/logwrapper /sbin/sysinit
+service sysinit /system/bin/logwrapper /system/bin/sysinit
     class late_start
     seclabel u:r:sysinit:s0
     user root
