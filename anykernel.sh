@@ -33,7 +33,7 @@ is_slot_device=0;
 chmod -R 750 $ramdisk/*
 chown -R root:root $ramdisk/*
 
-# Detect if LG bump devicecheck (credits to topjohnwu and Drgravy @xda-developers
+# Detect if LG bump devicecheck (credits to topjohnwu and Drgravy @xda-developers)
 LGE_G=false
 RBRAND=$(grep_prop ro.product.brand)
 RMODEL=$(grep_prop ro.product.device)
