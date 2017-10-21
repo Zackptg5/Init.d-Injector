@@ -77,19 +77,28 @@ ui_print " "
 dump_boot
 
 # determine install or uninstall
-test -f "initdpatch" && ACTION=Uninstall || ACTION=Install
+test "$(grep "ZIndicator" init.rc)" && ACTION=Uninstall || ACTION=Install
 
 # begin ramdisk changes
-replace_and_patch() {
-  test -f $1 && { backup_file $1; rm -f $1; sed -i -e "\|<FILES>| a\$1~" -e "\|<FILES2>| a\  rm -f $1" -e "s|rm -f /system|rm -f $S|g" $patch/initd.sh; }
-}
-
 if [ "$ACTION" == "Install" ]; then
-  # Add indicator file
-  touch initdpatch
-
-  # Search for init.d support
-  [ "$(find . -name 'init*.rc' -type f -exec grep -l 'init.d' {} \;)" ] && ui_print "Init files already patched!" || { ui_print "Patching init files..."; backup_file init.rc; append_file init.rc "# init.d" init; }
+  # remove old broken init.d support
+  ui_print "Removing existing init.d logic..."
+  for FILE in init*.rc; do
+    if [ "$(grep -E "init.d|sysinit" $FILE)" ]; then
+	  backup_file $FILE
+      remove_section_mod $FILE "# Run sysinit"
+      remove_line $FILE "start sysinit"
+      remove_section_mod $FILE "# sysinit"
+      remove_section_mod $FILE "service sysinit"
+      remove_section_mod $FILE "# init.d"
+      remove_section_mod $FILE "service userinit"
+	fi
+  done
+  
+  # add proper init.d patch
+  backup_file init.rc
+  ui_print "Patching init files..."
+  append_file init.rc "# init.d" init
   
   # replace old broken init.d
   ui_print "Replacing sysinit..."
@@ -139,12 +148,9 @@ if [ "$ACTION" == "Install" ]; then
 else
   ui_print "Removing init.d patches and sepolicy-inject..."
   rm -f sbin/sepolicy-inject sbin/sesearch sbin/seinfo /system/addon.d/99initd.sh
-  restore_file /system/bin/sysinit
-  restore_file /system/xbin/sysinit
-  restore_file /system/bin/sepolicy-inject
-  restore_file /system/xbin/sepolicy-inject
-  restore_file init.rc
-  restore_file sepolicy
+  for FILE in init*.rc sepolicy /system/bin/sysinit /system/xbin/sysinit /system/bin/sepolicy-inject /system/xbin/sepolicy-inject; do
+    restore_file $FILE
+  done
 fi
 
 # end ramdisk changes

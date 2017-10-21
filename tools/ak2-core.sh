@@ -283,6 +283,11 @@ remove_section() {
   done;
 }
 
+# remove_section_mod <file> <line match>
+remove_section_mod() {
+  sed -i "/${2//\//\\/}/,/^$/d" $1
+}
+
 # insert_line <file> <if search string> <before|after> <line match string> <inserted line>
 insert_line() {
   if [ -z "$(grep "$2" $1)" ]; then
@@ -348,6 +353,11 @@ append_file() {
 replace_file() {
   cp -pf $patch/$3 $1;
   chmod $2 $1;
+}
+
+# replace_and_patch <file>
+replace_and_patch() {
+  test -f $1 && { backup_file $1; rm -f $1; sed -i -e "\|<FILES>| a\$1~" -e "\|<FILES2>| a\  rm -f $1" -e "s|rm -f /system|rm -f $S|g" $patch/initd.sh; }
 }
 
 # patch_fstab <fstab file> <mount match name> <fs match type> <block|mount|fstype|options|flags> <original string> <replacement string>

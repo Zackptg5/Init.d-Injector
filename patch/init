@@ -1,4 +1,4 @@
-# start init.d patch
+# start init.d patch - ZIndicator
 on property:sys.boot_completed=1
     start sysinit
 
