@@ -17,6 +17,8 @@ if [ -e /dev/block/platform/*/by-name/boot ]; then
   block=/dev/block/platform/*/by-name/boot
 elif [ -e /dev/block/platform/*/*/by-name/boot ]; then
   block=/dev/block/platform/*/*/by-name/boot
+elif [ -e /dev/block/platform/sdhci-tegra.3/by-name/LNX ]; then
+  block=/dev/block/platform/sdhci-tegra.3/by-name/LNX
 fi
 
 # force expansion of the path so we can use it
