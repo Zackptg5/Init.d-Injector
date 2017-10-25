@@ -416,11 +416,6 @@ slot_detection() {
   fi;  
 }
 
-device_check() {
-  if [ "$(getprop ro.product.device)" == "$1" -o "$(getprop ro.build.product)" == "$1" ]; then
-    ui_print "$1 detected!"
-    return 1
-  fi
-} 
+device_check() { test "$(getprop ro.product.device)" == "$1" -o "$(getprop ro.build.product)" == "$1" && { ui_print "$1 detected!"; return 0; } || return 1; } 
 
 ## end methods
