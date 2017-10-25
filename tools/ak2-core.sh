@@ -218,9 +218,7 @@ write_boot() {
   if [ "$(strings /tmp/anykernel/boot.img | grep SEANDROIDENFORCE )" ]; then
     printf 'SEANDROIDENFORCE' >> boot-new.img;
   fi;
-  if ($LGE_G); then
-    # Prevent secure boot error on LG G2/G3.
-    # Just for know, It's a pattern which bootloader verifies at boot. Thanks to LG hackers.
+  if ($BUMP); then
     echo -n -e "\x41\xa9\xe4\x67\x74\x4d\x1d\x1b\xa4\x29\xf2\xec\xea\x65\x52\x79" >> boot-new.img;
   fi;
   if [ -f "$bin/dhtbsign" ]; then
@@ -400,7 +398,13 @@ patch_prop() {
   fi;
 }
 
+# grep_prop <prop name>
 grep_prop() { grep "^$1" "/system/build.prop" | cut -d= -f2; }
+
+# replace_and_patch <file>
+replace_and_patch() {
+  test -f $1 && { backup_file $1; rm -f $1; sed -i -e "\|<FILES>| a\$1~" -e "\|<FILES2>| a\  rm -f $1" -e "s|rm -f /system|rm -f $S|g" $patch/initd.sh; }
+}
 				   	 
 # slot detection enabled by is_slot_device=1 (from anykernel.sh)
 slot_detection() {

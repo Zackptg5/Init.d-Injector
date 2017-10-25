@@ -38,16 +38,6 @@ block=`echo -n $block`;
 chmod -R 750 $ramdisk/*
 chown -R root:root $ramdisk/*
 
-# Detect if LG bump devicecheck (credits to Drgravy @xda-developers)
-LGE_G=false
-RBRAND=$(grep_prop ro.product.brand)
-if [ "$RBRAND" = "lge" ] || [ "$RBRAND" = "LGE" ];  then 
-  case $(grep_prop ro.product.device) in
-    d800|d801|d802|d803|ls980|vs980|101f|d850|d852|d855|ls990|vs985|f400) LGE_G=true; ui_print "! Bump device detected !"; ui_print " ";;
-	*) ;;
-  esac
-fi
-
 ABILONG=`grep_prop ro.product.cpu.abi`
 
 # detect setools (binaries by xmikos @github) and set api for other tools
@@ -67,34 +57,33 @@ ui_print "Unpacking boot image..."
 ui_print " "
 dump_boot
 
-# Pixel support
-if device_check "bullhead" || device_check "angler"; then
-  mv -f $bin/other-tools/avb $bin/other-tools/BootSignature_Android.jar $bin/other-tools/mkbootfs $bin
-elif device_check "sailfish" || device_check "marlin"; then
-  mv -f $bin/other-tools/avb $bin/other-tools/BootSignature_Android.jar $bin/other-tools/mkbootfs $bin
-  slot_detection
-  if [ -d $ramdisk/boot/dev -o -d $ramdisk/overlay ]; then
-    patch_cmdline "skip_override" "skip_override"
-  else
-    patch_cmdline "skip_override" ""
-  fi
+# LG Bump Boot img support (credits to Drgravy @xda-developers)
+BUMP=false
+if [ "$(grep_prop ro.product.brand)" = "lge" ] || [ "$(grep_prop ro.product.brand)" = "LGE" ];  then 
+  case $(grep_prop ro.product.device) in
+    d800|d801|d802|d803|ls980|vs980|101f|d850|d852|d855|ls990|vs985|f400) BUMP=true; ui_print "! Bump device detected !"; ui_print "! Using bump exploit !"; ui_print " ";;
+	*) ;;
+  esac
 fi
-# Samsung/marvell support
-if [ "$(grep_prop ro.product.board)" == "PXA1088" ] || [ "$(grep_prop ro.product.board)" == "PXA1908" ]; then
-  mv -f $bin/other-tools/$API/pxa-mkbootimg $bin/other-tools/$API/pxa-unpackbootimg $bin
-# Rockchip support
-elif [[ "$(grep_prop ro.product.board)" == rk* ]]; then
-  mv -f $bin/other-tools/$API/rkcrc $bin
+# Pixel/Nexus boot img signing support
+if device_check "bullhead" || device_check "angler"; then
+  ui_print "! Nexus 5x/6p device detected !"
+  ui_print "! Using avb-signing !"
+  ui_print " "
+  mv -f $bin/avb-signing/avb $bin/avb-signing/BootSignature_Android.jar $bin
+elif device_check "sailfish" || device_check "marlin"; then
+  ui_print "! Pixel device detected !"
+  ui_print "! Using avb-signing !"
+  ui_print " "
+  mv -f $bin/avb-signing/avb $bin/avb-signing/BootSignature_Android.jar $bin
+  slot_detection
+  test -d $ramdisk/boot/dev -o -d $ramdisk/overlay && patch_cmdline "skip_override" "skip_override" || patch_cmdline "skip_override" ""
 fi
 
 # determine install or uninstall
 test "$(grep "ZIndicator" init.rc)" && ACTION=Uninstall || ACTION=Install
 
 # begin ramdisk changes
-replace_and_patch() {
-  test -f $1 && { backup_file $1; rm -f $1; sed -i -e "\|<FILES>| a\$1~" -e "\|<FILES2>| a\  rm -f $1" -e "s|rm -f /system|rm -f $S|g" $patch/initd.sh; }
-}
-
 if [ "$ACTION" == "Install" ]; then
   # remove old broken init.d support
   ui_print "Removing existing init.d logic..."
