@@ -40,15 +40,15 @@ chown -R root:root $ramdisk/*
 
 ABILONG=`grep_prop ro.product.cpu.abi`
 
-# detect setools (binaries by xmikos @github) and set api for other tools
+# detect setools (binaries by xmikos @github)
 case $ABILONG in
-  arm64*) API=arm64; SETOOLS=/tmp/anykernel/tools/setools-android/arm64-v8a;;
-  armeabi-v7a*) API=arm; SETOOLS=/tmp/anykernel/tools/setools-android/armeabi-v7a;;
-  arm*) API=arm; SETOOLS=/tmp/anykernel/tools/setools-android/armeabi;;
-  x86_64*) API=x86_64; SETOOLS=/tmp/anykernel/tools/setools-android/x86_64;;
-  x86*) API=x86; SETOOLS=/tmp/anykernel/tools/setools-android/x86;;
-  mips64*) API=mips64; SETOOLS=/tmp/anykernel/tools/setools-android/mips64;;
-  mips*) API=mips; SETOOLS=/tmp/anykernel/tools/setools-android/mips;;
+  arm64*) SETOOLS=/tmp/anykernel/tools/setools-android/arm64-v8a;;
+  armeabi-v7a*) SETOOLS=/tmp/anykernel/tools/setools-android/armeabi-v7a;;
+  arm*) SETOOLS=/tmp/anykernel/tools/setools-android/armeabi;;
+  x86_64*) SETOOLS=/tmp/anykernel/tools/setools-android/x86_64;;
+  x86*) SETOOLS=/tmp/anykernel/tools/setools-android/x86;;
+  mips64*) SETOOLS=/tmp/anykernel/tools/setools-android/mips64;;
+  mips*) SETOOLS=/tmp/anykernel/tools/setools-android/mips;;
   *) ui_print " "; abort " ! CPU Type not supported for sepolicy patching! Exiting!";;
 esac
 
