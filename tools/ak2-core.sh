@@ -4,6 +4,7 @@ ramdisk=/tmp/anykernel/ramdisk;
 bin=/tmp/anykernel/tools;
 split_img=/tmp/anykernel/split_img;
 patch=/tmp/anykernel/patch;
+ZIP=<ZIP>;
 
 chmod -R 755 $bin;
 mkdir -p $ramdisk $split_img;
@@ -399,22 +400,23 @@ patch_prop() {
   fi;
 }
 
-grep_prop() {
-  REGEX="s/^$1=//p"
-  shift
-  FILES=$@
-  [ -z "$FILES" ] && FILES='/system/build.prop'
-  sed -n "$REGEX" $FILES 2>/dev/null | head -n 1
-}
-
+grep_prop() { grep "^$1" "/system/build.prop" | cut -d= -f2; }
+				   	 
 # slot detection enabled by is_slot_device=1 (from anykernel.sh)
-if [ "$is_slot_device" == 1 ]; then
+slot_detection() {
   slot=$(getprop ro.boot.slot_suffix 2>/dev/null);
   test ! "$slot" && slot=$(grep -o 'androidboot.slot_suffix=.*$' /proc/cmdline | cut -d\  -f1 | cut -d= -f2);
   test "$slot" && block=$block$slot;
   if [ $? != 0 -o ! -e "$block" ]; then
     ui_print " "; ui_print "Unable to determine active boot slot. Aborting..."; exit 1;
-  fi;
-fi;
+  fi;  
+}
+
+device_check() {
+  if [ "$(getprop ro.product.device)" == "$1" -o "$(getprop ro.build.product)" == "$1" ]; then
+    ui_print "$1 detected!"
+    return 1
+  fi
+} 
 
 ## end methods

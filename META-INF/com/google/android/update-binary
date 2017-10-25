@@ -113,6 +113,7 @@ done;
 if [ $? != 0 -o -z "$(ls /tmp/anykernel/bin)" ]; then
   abort "Recovery busybox setup failed. Aborting...";
 fi;
+sed -i "s|<ZIP>|$ZIP|" /tmp/anykernel/tools/ak2-core.sh
 PATH="/tmp/anykernel/bin:$PATH" $bb ash /tmp/anykernel/anykernel.sh $2;
 if [ $? != "0" ]; then
   abort;

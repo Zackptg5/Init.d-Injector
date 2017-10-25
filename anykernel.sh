@@ -9,6 +9,11 @@ do.devicecheck=0
 do.modules=0
 do.cleanup=1
 do.cleanuponabort=1
+device.name1=
+device.name2=
+device.name3=
+device.name4=
+device.name5=			 
 } # end properties
 
 # shell variables
@@ -23,8 +28,6 @@ fi
 
 # force expansion of the path so we can use it
 block=`echo -n $block`;
-# enables detection of the suffix for the active boot partition on slot-based devices
-is_slot_device=0;
 
 ## AnyKernel methods (DO NOT CHANGE)
 # import patching functions/variables - see for reference
@@ -35,7 +38,7 @@ is_slot_device=0;
 chmod -R 750 $ramdisk/*
 chown -R root:root $ramdisk/*
 
-# Detect if LG bump devicecheck (credits to topjohnwu and Drgravy @xda-developers)
+# Detect if LG bump devicecheck (credits to Drgravy @xda-developers)
 LGE_G=false
 RBRAND=$(grep_prop ro.product.brand)
 if [ "$RBRAND" = "lge" ] || [ "$RBRAND" = "LGE" ];  then 
@@ -47,27 +50,51 @@ fi
 
 ABILONG=`grep_prop ro.product.cpu.abi`
 
-# detect setools (binaries by xmikos @github)
-  case $ABILONG in
-    arm64*) SETOOLS=/tmp/anykernel/tools/setools-android/arm64-v8a;;
-    armeabi-v7a*) SETOOLS=/tmp/anykernel/tools/setools-android/armeabi-v7a;;
-    arm*) SETOOLS=/tmp/anykernel/tools/setools-android/armeabi;;
-    x86_64*) SETOOLS=/tmp/anykernel/tools/setools-android/x86_64;;
-    x86*) SETOOLS=/tmp/anykernel/tools/setools-android/x86;;
-    mips64*) SETOOLS=/tmp/anykernel/tools/setools-android/mips64;;
-    mips*) SETOOLS=/tmp/anykernel/tools/setools-android/mips;;
-    *) ui_print " "; abort " ! CPU Type not supported for sepolicy patching! Exiting!";;
-  esac
+# detect setools (binaries by xmikos @github) and set api for other tools
+case $ABILONG in
+  arm64*) API=arm64; SETOOLS=/tmp/anykernel/tools/setools-android/arm64-v8a;;
+  armeabi-v7a*) API=arm; SETOOLS=/tmp/anykernel/tools/setools-android/armeabi-v7a;;
+  arm*) API=arm; SETOOLS=/tmp/anykernel/tools/setools-android/armeabi;;
+  x86_64*) API=x86_64; SETOOLS=/tmp/anykernel/tools/setools-android/x86_64;;
+  x86*) API=x86; SETOOLS=/tmp/anykernel/tools/setools-android/x86;;
+  mips64*) API=mips64; SETOOLS=/tmp/anykernel/tools/setools-android/mips64;;
+  mips*) API=mips; SETOOLS=/tmp/anykernel/tools/setools-android/mips;;
+  *) ui_print " "; abort " ! CPU Type not supported for sepolicy patching! Exiting!";;
+esac
 
 ## AnyKernel install
 ui_print "Unpacking boot image..."
 ui_print " "
 dump_boot
 
+# Pixel support
+if device_check "bullhead" || device_check "angler"; then
+  mv -f $bin/other-tools/avb $bin/other-tools/BootSignature_Android.jar $bin/other-tools/mkbootfs $bin
+elif device_check "sailfish" || device_check "marlin"; then
+  mv -f $bin/other-tools/avb $bin/other-tools/BootSignature_Android.jar $bin/other-tools/mkbootfs $bin
+  slot_detection
+  if [ -d $ramdisk/boot/dev -o -d $ramdisk/overlay ]; then
+    patch_cmdline "skip_override" "skip_override"
+  else
+    patch_cmdline "skip_override" ""
+  fi
+fi
+# Samsung/marvell support
+if [ "$(grep_prop ro.product.board)" == "PXA1088" ] || [ "$(grep_prop ro.product.board)" == "PXA1908" ]; then
+  mv -f $bin/other-tools/$API/pxa-mkbootimg $bin/other-tools/$API/pxa-unpackbootimg $bin
+# Rockchip support
+elif [[ "$(grep_prop ro.product.board)" == rk* ]]; then
+  mv -f $bin/other-tools/$API/rkcrc $bin
+fi
+
 # determine install or uninstall
 test "$(grep "ZIndicator" init.rc)" && ACTION=Uninstall || ACTION=Install
 
 # begin ramdisk changes
+replace_and_patch() {
+  test -f $1 && { backup_file $1; rm -f $1; sed -i -e "\|<FILES>| a\$1~" -e "\|<FILES2>| a\  rm -f $1" -e "s|rm -f /system|rm -f $S|g" $patch/initd.sh; }
+}
+
 if [ "$ACTION" == "Install" ]; then
   # remove old broken init.d support
   ui_print "Removing existing init.d logic..."
