@@ -154,7 +154,7 @@ if [ "$ACTION" == "Install" ]; then
 else
   ui_print "Removing init.d patches and sepolicy-inject..."
   rm -f sbin/sepolicy-inject sbin/sesearch sbin/seinfo /system/addon.d/99initd.sh
-  for FILE in init*.rc sepolicy /system/bin/sysinit /system/xbin/sysinit /system/bin/sepolicy-inject /system/xbin/sepolicy-inject /system/bin/install-recovery.sh; do
+  for FILE in init*.rc sepolicy /system/bin/sysinit /system/xbin/sysinit /system/bin/sepolicy-inject /system/xbin/sepolicy-inject $(find /system -name install-recovery.sh); do
     restore_file $FILE
   done
 fi
