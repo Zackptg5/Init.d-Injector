@@ -99,6 +99,8 @@ if [ "$ACTION" == "Install" ]; then
 	fi
   done
   
+  test -f /system/bin/install-recovery.sh && { backup_file /system/bin/install-recovery.sh; sed -i '/init.d/d' /system/bin/install-recovery.sh; }
+  
   # add proper init.d patch
   backup_file init.rc
   ui_print "Patching init files..."
@@ -152,7 +154,7 @@ if [ "$ACTION" == "Install" ]; then
 else
   ui_print "Removing init.d patches and sepolicy-inject..."
   rm -f sbin/sepolicy-inject sbin/sesearch sbin/seinfo /system/addon.d/99initd.sh
-  for FILE in init*.rc sepolicy /system/bin/sysinit /system/xbin/sysinit /system/bin/sepolicy-inject /system/xbin/sepolicy-inject; do
+  for FILE in init*.rc sepolicy /system/bin/sysinit /system/xbin/sysinit /system/bin/sepolicy-inject /system/xbin/sepolicy-inject /system/bin/install-recovery.sh; do
     restore_file $FILE
   done
 fi
