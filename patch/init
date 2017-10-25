@@ -7,6 +7,6 @@ service sysinit /system/bin/logwrapper /system/bin/sysinit
     seclabel u:r:sysinit:s0
     user root
     group root
-    disabled
     oneshot
+    disabled
 # end init.d patch
