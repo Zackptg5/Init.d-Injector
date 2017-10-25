@@ -38,25 +38,11 @@ chown -R root:root $ramdisk/*
 # Detect if LG bump devicecheck (credits to topjohnwu and Drgravy @xda-developers)
 LGE_G=false
 RBRAND=$(grep_prop ro.product.brand)
-RMODEL=$(grep_prop ro.product.device)
 if [ "$RBRAND" = "lge" ] || [ "$RBRAND" = "LGE" ];  then 
-  if [ "$RMODEL" = "d800" ] ||
-     [ "$RMODEL" = "d801" ] ||
-     [ "$RMODEL" = "d802" ] ||
-     [ "$RMODEL" = "d803" ] || 
-     [ "$RMODEL" = "ls980" ] ||
-     [ "$RMODEL" = "vs980" ] ||
-     [ "$RMODEL" = "l01f" ] || 
-     [ "$RMODEL" = "d850" ] ||
-     [ "$RMODEL" = "d852" ] ||
-     [ "$RMODEL" = "d855" ] ||
-     [ "$RMODEL" = "ls990" ] ||
-     [ "$RMODEL" = "vs985" ] ||
-     [ "$RMODEL" = "f400" ]; then
-    LGE_G=true
-    ui_print "! Bump device detected !"
-	ui_print " "
-  fi
+  case $(grep_prop ro.product.device) in
+    d800|d801|d802|d803|ls980|vs980|101f|d850|d852|d855|ls990|vs985|f400) LGE_G=true; ui_print "! Bump device detected !"; ui_print " ";;
+	*) ;;
+  esac
 fi
 
 ABILONG=`grep_prop ro.product.cpu.abi`
