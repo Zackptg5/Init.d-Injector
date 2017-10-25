@@ -99,7 +99,7 @@ if [ "$ACTION" == "Install" ]; then
 	fi
   done
   
-  test -f /system/bin/install-recovery.sh && { backup_file /system/bin/install-recovery.sh; sed -i '/init.d/d' /system/bin/install-recovery.sh; }
+  test -e $(find /system -name install-recovery.sh) && { backup_file $(find /system -name install-recovery.sh); sed -i '/init.d/d' $(find /system -name install-recovery.sh); }
   
   # add proper init.d patch
   backup_file init.rc
