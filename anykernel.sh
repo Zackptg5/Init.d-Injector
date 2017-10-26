@@ -101,6 +101,9 @@ if [ "$ACTION" == "Install" ]; then
   
   test -e $(find /system -name install-recovery.sh) && { backup_file $(find /system -name install-recovery.sh); sed -i '/init.d/d' $(find /system -name install-recovery.sh); }
   
+  # create init.d directory
+  test ! -d /system/etc/init.d && { test -f /system/etc/init.d && rm -f /system/etc/init.d; mkdir /system/etc/init.d; }
+  
   # add proper init.d patch
   backup_file init.rc
   ui_print "Patching init files..."

@@ -6,11 +6,6 @@ echo "Starting init.d..."
 
 mount -o remount,rw /system
 
-if [ ! -d /system/etc/init.d ]; then
-    rm -f /system/etc/init.d
-    mkdir /system/etc/init.d
-fi
-
 chmod -R 755 /system/etc/init.d/*
 
 for FILE in /system/etc/init.d/*; do
