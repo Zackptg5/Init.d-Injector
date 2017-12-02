@@ -124,7 +124,7 @@ if [ "$ACTION" == "Install" ]; then
 
   # Add backup script
   sed -i -e "s|<block>|$block|" -e "/<FILES>/d" -e "/<FILES2>/d" $patch/initd.sh
-  test -d "/system/addon.d" && { ui_print "Installing addon.d script..."; cp -f $patch/initd.sh /system/addon.d/99initd.sh; chmod 0755 /system/addon.d/99initd.sh; } || { ui_print "No addon.d support detected!"; "Patched boot img won't survive dirty flash!"; }
+  if [ -d /system/addon.d ]; then ui_print "Installing addon.d script..."; cp -f $patch/initd.sh /system/addon.d/99initd.sh; chmod 0755 /system/addon.d/99initd.sh; else ui_print "No addon.d support detected!"; ui_print "Patched boot img won't survive dirty flash!"; fi
 
   # copy setools
   ui_print "Installing setools to /sbin..."

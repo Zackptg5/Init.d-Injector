@@ -53,6 +53,10 @@ is_mounted() {
 mount_system() { 
   # Check A/B slot
   SLOT=`getprop ro.boot.slot_suffix`
+  if [ -z $SLOT ]; then
+    SLOT=_`getprop ro.boot.slot`
+    [ $SLOT = "_" ] && SLOT=
+  fi
   [ -z $SLOT ] || ui_print "A/B partition detected, current slot: $SLOT"
   ui_print "Mounting /system for addon.d script"
   is_mounted /system || [ -f /system/build.prop ] || mount -o rw /system 2>/dev/null
