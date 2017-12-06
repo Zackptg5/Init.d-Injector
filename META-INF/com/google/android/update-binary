@@ -31,6 +31,9 @@ debugging() {
       ui_print "Creating debugging archive in zip directory...";
       $bb tar -czvf "$DIR/anykernel2-$(date +%Y-%m-%d_%H%M%S)-debug.tgz" /tmp/*;
     ;;
+    *-uninstall)
+      ACTION=Uninstall;
+    ;;
   esac;
 }
 abort() {
@@ -121,7 +124,7 @@ done;
 if [ $? != 0 -o -z "$(ls /tmp/anykernel/bin)" ]; then
   abort "Recovery busybox setup failed. Aborting...";
 fi;
-sed -i "s|<ZIP>|$ZIP|" /tmp/anykernel/tools/ak2-core.sh
+if [ -z $SLOT ]; then sed -i "/<ACTION>/d" /tmp/anykernel/tools/ak2-core.sh; else sed -i "s|<ACTION>|$ACTION|" /tmp/anykernel/tools/ak2-core.sh; fi
 if [ -z $SLOT ]; then sed -i "/<SLOT>/d" /tmp/anykernel/tools/ak2-core.sh; else sed -i "s|<SLOT>|$SLOT|" /tmp/anykernel/tools/ak2-core.sh; fi
 PATH="/tmp/anykernel/bin:$PATH" $bb ash /tmp/anykernel/anykernel.sh $2;
 if [ $? != "0" ]; then

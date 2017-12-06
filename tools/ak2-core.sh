@@ -4,8 +4,8 @@ ramdisk=/tmp/anykernel/ramdisk;
 bin=/tmp/anykernel/tools;
 split_img=/tmp/anykernel/split_img;
 patch=/tmp/anykernel/patch;
-ZIP=<ZIP>;
-SLOT="<SLOT>";
+slot=<slot>;
+ACTION=<ACTION>;
 
 chmod -R 755 $bin;
 mkdir -p $ramdisk $split_img;

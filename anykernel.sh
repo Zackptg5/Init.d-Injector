@@ -66,16 +66,16 @@ fi
 # Pixel/Nexus boot img signing support
 if device_check "bullhead" || device_check "angler"; then
   mv -f $bin/avb-signing/avb $bin/avb-signing/BootSignature_Android.jar $bin
-elif [ ! -z $SLOT ]; then
+elif [ ! -z $slot ]; then
   mv -f $bin/avb-signing/avb $bin/avb-signing/BootSignature_Android.jar $bin
   test -d $ramdisk/boot/dev -o -d $ramdisk/overlay && patch_cmdline "skip_override" "skip_override" || patch_cmdline "skip_override" ""
 fi
 
 # determine install or uninstall
-test "$(grep "ZIndicator" init.rc)" && ACTION=Uninstall || ACTION=Install
+test "$(grep "ZIndicator" init.rc)" && ACTION=Uninstall
 
 # begin ramdisk changes
-if [ "$ACTION" == "Install" ]; then
+if [ -z $ACTION ]; then
   # remove old broken init.d support
   ui_print "Removing existing init.d logic..."
   for FILE in init*.rc; do
