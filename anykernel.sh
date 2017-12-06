@@ -38,10 +38,8 @@ block=`echo -n $block`;
 chmod -R 750 $ramdisk/*
 chown -R root:root $ramdisk/*
 
-ABILONG=`grep_prop ro.product.cpu.abi`
-
 # detect setools (binaries by xmikos @github)
-case $ABILONG in
+case $(grep_prop ro.product.cpu.abi) in
   arm64*) SETOOLS=/tmp/anykernel/tools/setools-android/arm64-v8a;;
   armeabi-v7a*) SETOOLS=/tmp/anykernel/tools/setools-android/armeabi-v7a;;
   arm*) SETOOLS=/tmp/anykernel/tools/setools-android/armeabi;;
@@ -67,16 +65,9 @@ if [ "$(grep_prop ro.product.brand)" = "lge" ] || [ "$(grep_prop ro.product.bran
 fi
 # Pixel/Nexus boot img signing support
 if device_check "bullhead" || device_check "angler"; then
-  ui_print "! Nexus 5x/6p device detected !"
-  ui_print "! Using avb-signing !"
-  ui_print " "
   mv -f $bin/avb-signing/avb $bin/avb-signing/BootSignature_Android.jar $bin
-elif device_check "sailfish" || device_check "marlin"; then
-  ui_print "! Pixel device detected !"
-  ui_print "! Using avb-signing !"
-  ui_print " "
+elif [ ! -z $SLOT ]; then
   mv -f $bin/avb-signing/avb $bin/avb-signing/BootSignature_Android.jar $bin
-  slot_detection
   test -d $ramdisk/boot/dev -o -d $ramdisk/overlay && patch_cmdline "skip_override" "skip_override" || patch_cmdline "skip_override" ""
 fi
 

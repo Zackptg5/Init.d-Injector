@@ -21,7 +21,7 @@ set_perm_recursive() {
     $bb find "$i" -type f -exec chmod $4 {} +;
   done;
 }
-file_getprop() { grep "^$2" "$1" | cut -d= -f2; }
+file_getprop() { grep "^$2=" "$1" | cut -d= -f2; }
 getprop() { test -e /sbin/getprop && /sbin/getprop $1 || file_getprop /default.prop $1; }
 cleanup() { rm -rf /tmp/anykernel; }
 debugging() {
@@ -42,12 +42,16 @@ abort() {
   umount -l /system_root 2>/dev/null
   exit 1;
 }
+resolve_link() {
+  RESOLVED="$1"
+  while RESOLVE=`readlink $RESOLVED`; do
+    RESOLVED=$RESOLVE
+  done
+  echo $RESOLVED
+}
 is_mounted() {
-  if [ ! -z "$2" ]; then
-    cat /proc/mounts | grep $1 | grep $2, >/dev/null
-  else
-    cat /proc/mounts | grep $1 >/dev/null
-  fi
+  TARGET="`resolve_link $1`"
+  cat /proc/mounts | grep " $TARGET " >/dev/null
   return $?
 }
 mount_system() { 
@@ -118,6 +122,7 @@ if [ $? != 0 -o -z "$(ls /tmp/anykernel/bin)" ]; then
   abort "Recovery busybox setup failed. Aborting...";
 fi;
 sed -i "s|<ZIP>|$ZIP|" /tmp/anykernel/tools/ak2-core.sh
+if [ -z $SLOT ]; then sed -i "/<SLOT>/d" /tmp/anykernel/tools/ak2-core.sh; else sed -i "s|<SLOT>|$SLOT|" /tmp/anykernel/tools/ak2-core.sh; fi
 PATH="/tmp/anykernel/bin:$PATH" $bb ash /tmp/anykernel/anykernel.sh $2;
 if [ $? != "0" ]; then
   abort;
