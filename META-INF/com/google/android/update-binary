@@ -59,16 +59,16 @@ is_mounted() {
 }
 mount_system() { 
   # Check A/B slot
-  SLOT=`getprop ro.boot.slot_suffix`
-  if [ -z $SLOT ]; then
-    SLOT=_`getprop ro.boot.slot`
-    [ $SLOT = "_" ] && SLOT=
+  slot=`getprop ro.boot.slot_suffix`
+  if [ -z $slot ]; then
+    slot=_`getprop ro.boot.slot`
+    [ $slot = "_" ] && slot=
   fi
-  [ -z $SLOT ] || ui_print "A/B partition detected, current slot: $SLOT"
+  [ -z $slot ] || ui_print "A/B partition detected, current slot: $slot"
   ui_print "Mounting /system for addon.d script"
   is_mounted /system || [ -f /system/build.prop ] || mount -o rw /system 2>/dev/null
   if ! is_mounted /system && ! [ -f /system/build.prop ]; then
-    SYSTEMBLOCK=`find /dev/block -iname system$SLOT | head -n 1`
+    SYSTEMBLOCK=`find /dev/block -iname system$slot | head -n 1`
     mount -t ext4 -o rw $SYSTEMBLOCK /system
   fi
   is_mounted /system || [ -f /system/build.prop ] || abort "! Cannot mount /system"
@@ -124,8 +124,8 @@ done;
 if [ $? != 0 -o -z "$(ls /tmp/anykernel/bin)" ]; then
   abort "Recovery busybox setup failed. Aborting...";
 fi;
-if [ -z $SLOT ]; then sed -i "/<ACTION>/d" /tmp/anykernel/tools/ak2-core.sh; else sed -i "s|<ACTION>|$ACTION|" /tmp/anykernel/tools/ak2-core.sh; fi
-if [ -z $SLOT ]; then sed -i "/<SLOT>/d" /tmp/anykernel/tools/ak2-core.sh; else sed -i "s|<SLOT>|$SLOT|" /tmp/anykernel/tools/ak2-core.sh; fi
+if [ -z $slot ]; then sed -i "/<ACTION>/d" /tmp/anykernel/tools/ak2-core.sh; else sed -i "s|<ACTION>|$ACTION|" /tmp/anykernel/tools/ak2-core.sh; fi
+if [ -z $slot ]; then sed -i "/<slot>/d" /tmp/anykernel/tools/ak2-core.sh; else sed -i "s|<slot>|$slot|" /tmp/anykernel/tools/ak2-core.sh; fi
 PATH="/tmp/anykernel/bin:$PATH" $bb ash /tmp/anykernel/anykernel.sh $2;
 if [ $? != "0" ]; then
   abort;
