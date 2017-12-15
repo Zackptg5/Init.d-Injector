@@ -19,7 +19,7 @@ ui_print() { echo -e "ui_print $1\nui_print" > $OUTFD; }
 contains() { test "${1#*$2}" != "$1" && return 0 || return 1; }
 
 # dump boot and extract ramdisk
-dump_boot() {
+split_boot() {
   if [ ! -e "$(echo $block | cut -d\  -f1)" ]; then
     ui_print " "; ui_print "Invalid partition. Aborting..."; exit 1;
   fi;
@@ -63,10 +63,6 @@ dump_boot() {
   if [ $? != 0 -o "$dumpfail" ]; then
     ui_print " "; ui_print "Dumping/splitting image failed. Aborting..."; exit 1;
   fi;
-  if [ -f "$bin/mkmtkhdr" ]; then
-    dd bs=512 skip=1 conv=notrunc if=$split_img/boot.img-ramdisk.gz of=$split_img/temprd;
-    mv -f $split_img/temprd $split_img/boot.img-ramdisk.gz;
-  fi;
   if [ -f "$bin/unpackelf" -a -f "$split_img/boot.img-dtb" ]; then
     case $(od -ta -An -N4 $split_img/boot.img-dtb | sed -e 's/del //' -e 's/   //g') in
       QCDT|ELF) ;;
@@ -75,6 +71,12 @@ dump_boot() {
          cat $split_img/boot.img-dtb >> $split_img/boot.img-zImage;
          rm -f $split_img/boot.img-dtb;;
     esac;
+  fi;
+}
+unpack_ramdisk() {
+  if [ -f "$bin/mkmtkhdr" ]; then
+    dd bs=512 skip=1 conv=notrunc if=$split_img/boot.img-ramdisk.gz of=$split_img/temprd;
+    mv -f $split_img/temprd $split_img/boot.img-ramdisk.gz;
   fi;
   mv -f $ramdisk /tmp/anykernel/rdtmp;
    case $(od -ta -An -N4 $split_img/boot.img-ramdisk.gz) in
@@ -98,9 +100,42 @@ dump_boot() {
   test ! -z "$(ls /tmp/anykernel/rdtmp)" && cp -af /tmp/anykernel/rdtmp/* $ramdisk;
   rm -f $ramdisk/placeholder
 }
+dump_boot() {
+  split_boot;
+  unpack_ramdisk;
+}            
 
 # repack ramdisk then build and write image
-write_boot() {
+repack_ramdisk() {
+  case $ramdisk_compression in
+    auto|"") compext=`echo $split_img/*-ramdisk.cpio.* | rev | cut -d. -f1 | rev`;;
+    *) compext=$ramdisk_compression;;
+  esac;
+  case $compext in
+    gz) repackcmd="gzip";;
+    lzo) repackcmd="lzo";;
+    lzma) repackcmd="$bin/xz -Flzma";;
+    xz) repackcmd="$bin/xz -Ccrc32";;
+    bz2) repackcmd="bzip2";;
+    lz4-l) repackcmd="$bin/lz4 -l";;
+    lz4) repackcmd="$bin/lz4";;
+  esac;
+  if [ -f "$bin/mkbootfs" ]; then
+    $bin/mkbootfs $ramdisk | $repackcmd -9c > /tmp/anykernel/ramdisk-new.cpio.$compext;
+  else
+    cd $ramdisk;
+    find . | cpio -H newc -o | $repackcmd -9c > /tmp/anykernel/ramdisk-new.cpio.$compext;
+  fi;
+  if [ $? != 0 ]; then
+    ui_print " "; ui_print "Repacking ramdisk failed. Aborting..."; exit 1;
+  fi;
+  cd /tmp/anykernel;
+  if [ -f "$bin/mkmtkhdr" ]; then
+    $bin/mkmtkhdr --rootfs ramdisk-new.cpio.$compext;
+    mv -f ramdisk-new.cpio.$compext-mtk ramdisk-new.cpio.$compext;
+  fi;
+}
+flash_boot() {             
   cd $split_img;
   if [ -f "$bin/mkimage" ]; then
     name=`cat *-name`;
@@ -156,6 +191,12 @@ write_boot() {
     kernel=`ls *-zImage`;
     kernel=$split_img/$kernel;
   fi;
+  if [ -f /tmp/anykernel/ramdisk-new.cpio.$compext ]; then
+    rd=/tmp/anykernel/ramdisk-new.cpio.$compext;
+  else
+    rd=`ls *-ramdisk.*`;
+    rd="$split_img/$rd";
+  fi;    
   for i in dtb dt.img; do
     if [ -f /tmp/anykernel/$i ]; then
       dtb="--dt /tmp/anykernel/$i";
@@ -166,49 +207,25 @@ write_boot() {
     dtb=`ls *-dtb`;
     dtb="--dt $split_img/$dtb";
   fi;
-  case $ramdisk_compression in
-    auto|"") compext=`echo $split_img/boot.img-ramdisk.cpio.* | rev | cut -d. -f1 | rev`;;
-    *) compext=$ramdisk_compression;;
-  esac;
-  case $compext in
-    gz) repackcmd="gzip";;
-    lzo) repackcmd="lzo";;
-    lzma) repackcmd="$bin/xz -Flzma";;
-    xz) repackcmd="$bin/xz -Ccrc32";;
-    bz2) repackcmd="bzip2";;
-    lz4-l) repackcmd="$bin/lz4 -l";;
-    lz4) repackcmd="$bin/lz4";;
-  esac;
-  if [ -f "$bin/mkbootfs" ]; then
-    $bin/mkbootfs $ramdisk | $repackcmd -9c > /tmp/anykernel/ramdisk-new.cpio.$compext;
-  else
-    cd $ramdisk;
-    find . | cpio -H newc -o | $repackcmd -9c > /tmp/anykernel/ramdisk-new.cpio.$compext;
-  fi;
-  if [ $? != 0 ]; then
-    ui_print " "; ui_print "Repacking ramdisk failed. Aborting..."; exit 1;
-  fi;
   cd /tmp/anykernel;
   if [ -f "$bin/mkmtkhdr" ]; then
-    $bin/mkmtkhdr --rootfs ramdisk-new.cpio.$compext;
-    mv -f ramdisk-new.cpio.$compext-mtk ramdisk-new.cpio.$compext;
     case $kernel in
       $split_img/*) ;;
       *) $bin/mkmtkhdr --kernel $kernel; kernel=$kernel-mtk;;
     esac;
   fi;
   if [ -f "$bin/mkimage" ]; then
-    $bin/mkimage -A $arch -O $os -T $type -C $comp -a $addr -e $ep -n "$name" -d $kernel:ramdisk-new.cpio.$compext boot-new.img;
+    $bin/mkimage -A $arch -O $os -T $type -C $comp -a $addr -e $ep -n "$name" -d $kernel:$rd boot-new.img;
   elif [ -f "$bin/rkcrc" ]; then
-    $bin/rkcrc -k ramdisk-new.cpio.$compext boot-new.img;
+    $bin/rkcrc -k $rd boot-new.img;
   elif [ -f "$bin/pxa-mkbootimg" ]; then
-    $bin/pxa-mkbootimg --kernel $kernel --ramdisk ramdisk-new.cpio.$compext $second --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff $secondoff --tags_offset "$tagsoff" --unknown $unknown $dtb --output boot-new.img;
+    $bin/pxa-mkbootimg --kernel $kernel --ramdisk $rd $second --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff $secondoff --tags_offset "$tagsoff" --unknown $unknown $dtb --output boot-new.img;
   else
-    $bin/mkbootimg --kernel $kernel --ramdisk ramdisk-new.cpio.$compext $second --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff $secondoff --tags_offset "$tagsoff" --os_version "$osver" --os_patch_level "$oslvl" $hash $dtb --output boot-new.img;
+    $bin/mkbootimg --kernel $kernel --ramdisk $rd $second --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff $secondoff --tags_offset "$tagsoff" --os_version "$osver" --os_patch_level "$oslvl" $hash $dtb --output boot-new.img;
   fi;
   if [ $? != 0 ]; then
     ui_print " "; ui_print "Repacking image failed. Aborting..."; exit 1;
-  elif [ `wc -c < boot-new.img` -gt `wc -c < boot.img` ]; then
+  elif [ "$(wc -c < boot-new.img)" -gt "$(wc -c < boot.img)" ]; then
     ui_print " "; ui_print "New image larger than boot partition. Aborting..."; exit 1;
   fi;
   if [ -f "$bin/futility" -a -d "$bin/chromeos" ]; then
@@ -244,7 +261,7 @@ write_boot() {
   if [ "$(strings /tmp/anykernel/boot.img | grep SEANDROIDENFORCE )" ]; then
     printf 'SEANDROIDENFORCE' >> boot-new.img;
   fi;
-  if ($BUMP); then
+  if ($bump); then
     echo -n -e "\x41\xa9\xe4\x67\x74\x4d\x1d\x1b\xa4\x29\xf2\xec\xea\x65\x52\x79" >> boot-new.img;
   fi;
   if [ -f "$bin/dhtbsign" ]; then
@@ -255,6 +272,9 @@ write_boot() {
     cat $split_img/boot.img-master_boot.key boot-new.img > boot-new-signed.img;
     mv -f boot-new-signed.img boot-new.img;
   fi;
+  if [ ! -f /tmp/anykernel/boot-new.img ]; then
+    ui_print " "; ui_print "Repacked image could not be found. Aborting..."; exit 1;
+  fi;  
   if [ -f "$bin/flash_erase" -a -f "$bin/nandwrite" ]; then
     $bin/flash_erase $block 0 0;
     $bin/nandwrite -p $block /tmp/anykernel/boot-new.img;
@@ -282,6 +302,10 @@ write_boot() {
     fi;
   fi;
 }
+write_boot() {
+  repack_ramdisk;
+  flash_boot;
+}              
 
 # backup_file <file>
 backup_file() { test ! -f $1~ && cp $1 $1~; }
@@ -399,9 +423,9 @@ replace_file() {
   chmod $2 $1;
 }
 
-# replace_and_patch <file>
-replace_and_patch() {
-  test -f $1 && { backup_file $1; rm -f $1; sed -i -e "\|<FILES>| a\$1~" -e "\|<FILES2>| a\  rm -f $1" -e "s|rm -f /system|rm -f $S|g" $patch/initd.sh; }
+# backup_and_remove <file>
+backup_and_remove() {
+  test -f $1 && { backup_file $1; rm -f $1; }
 }
 
 # patch_fstab <fstab file> <mount match name> <fs match type> <block|mount|fstype|options|flags> <original string> <replacement string>
@@ -445,11 +469,6 @@ patch_prop() {
 
 # grep_prop <prop name>
 grep_prop() { grep "^$1" "/system/build.prop" | cut -d= -f2; }
-
-# replace_and_patch <file>
-replace_and_patch() {
-  test -f $1 && { backup_file $1; rm -f $1; sed -i -e "\|<FILES>| a\$1~" -e "\|<FILES2>| a\  rm -f $1" -e "s|rm -f /system|rm -f $S|g" $patch/initd.sh; }
-}
 
 device_check() { test "$(getprop ro.product.device)" == "$1" -o "$(getprop ro.build.product)" == "$1" && return 0 || return 1; } 
 

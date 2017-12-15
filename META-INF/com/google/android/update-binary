@@ -42,7 +42,8 @@ abort() {
   if [ ! -f /tmp/anykernel/anykernel.sh -o "$(file_getprop /tmp/anykernel/anykernel.sh do.cleanuponabort 2>/dev/null)" == 1 ]; then
     cleanup;
   fi;
-  umount -l /system_root 2>/dev/null
+  umount -l /system_root 2>/dev/null;
+  umount -l /system 2>/dev/null;                       
   exit 1;
 }
 resolve_link() {
@@ -65,7 +66,6 @@ mount_system() {
     [ $slot = "_" ] && slot=
   fi
   [ -z $slot ] || ui_print "A/B partition detected, current slot: $slot"
-  ui_print "Mounting /system for addon.d script"
   is_mounted /system || [ -f /system/build.prop ] || mount -o rw /system 2>/dev/null
   if ! is_mounted /system && ! [ -f /system/build.prop ]; then
     SYSTEMBLOCK=`find /dev/block -iname system$slot | head -n 1`
@@ -145,7 +145,7 @@ if [ "$(file_getprop /tmp/anykernel/anykernel.sh do.cleanup)" == 1 ]; then
   cleanup;
 fi;
 
-umount -l /system_root 2>/dev/null
+umount -l /system_root 2>/dev/null;
 umount -l /system 2>/dev/null;
 ui_print " ";
 ui_print "Done!";
