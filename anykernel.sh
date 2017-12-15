@@ -87,19 +87,18 @@ if [ ! -z $slot ]; then
     mkdir -p $overlay/$rddir
     test ! -f $overlay/$rdfile && cp -rp /system/$rdfile $overlay/$rddir/
   done
-  overlay="${overlay}/"
 else
-  overlay=""
+  overlay=$ramdisk
 fi
 
 # determine install or uninstall
-test "$(grep "ZIndicator" $overlay\init.rc)" && ACTION=Uninstall
+test "$(grep "ZIndicator" $overlay/init.rc)" && ACTION=Uninstall
 
 # begin ramdisk changes
 if [ -z $ACTION ]; then
   # remove old broken init.d support
   ui_print "Removing existing init.d logic..."
-  for FILE in $overlay\init*.rc; do
+  for FILE in $overlay/init*.rc; do
     if [ "$(grep -E "init.d|sysinit" $FILE)" ]; then
 	    backup_file $FILE
       remove_section_mod $FILE "# Run sysinit"
@@ -117,9 +116,9 @@ if [ -z $ACTION ]; then
   test ! -d /system/etc/init.d && { test -f /system/etc/init.d && rm -f /system/etc/init.d; mkdir /system/etc/init.d; }
   
   # add proper init.d patch
-  backup_file $overlay\init.rc
+  backup_file $overlay/init.rc
   ui_print "Patching init files..."
-  append_file $overlay\init.rc "# init.d" init
+  append_file $overlay/init.rc "# init.d" init
   
   # replace old broken init.d
   ui_print "Replacing sysinit..."
@@ -143,29 +142,29 @@ if [ -z $ACTION ]; then
   ui_print "Injecting sepolicy with init.d permissions..."
   
   backup_file sepolicy
-  $SETOOLS/sepolicy-inject -z sysinit -P $overlay\sepolicy
-  $SETOOLS/sepolicy-inject -Z sysinit -P $overlay\sepolicy
-  $SETOOLS/sepolicy-inject -s init -t sysinit -c process -p transition -P $overlay\sepolicy
-  $SETOOLS/sepolicy-inject -s init -t sysinit -c process -p rlimitinh -P $overlay\sepolicy
-  $SETOOLS/sepolicy-inject -s init -t sysinit -c process -p siginh -P $overlay\sepolicy
-  $SETOOLS/sepolicy-inject -s init -t sysinit -c process -p noatsecure -P $overlay\sepolicy
-  $SETOOLS/sepolicy-inject -s sysinit -t sysinit -c dir -p search,read -P $overlay\sepolicy
-  $SETOOLS/sepolicy-inject -s sysinit -t sysinit -c file -p read,write,open -P $overlay\sepolicy
-  $SETOOLS/sepolicy-inject -s sysinit -t sysinit -c unix_dgram_socket -p create,connect,write,setopt -P $overlay\sepolicy
-  $SETOOLS/sepolicy-inject -s sysinit -t sysinit -c lnk_file -p read -P $overlay\sepolicy
-  $SETOOLS/sepolicy-inject -s sysinit -t sysinit -c process -p fork,sigchld -P $overlay\sepolicy
-  $SETOOLS/sepolicy-inject -s sysinit -t sysinit -c capability -p dac_override -P $overlay\sepolicy
-  $SETOOLS/sepolicy-inject -s sysinit -t system_file -c file -p entrypoint,execute_no_trans -P $overlay\sepolicy
-  $SETOOLS/sepolicy-inject -s sysinit -t devpts -c chr_file -p read,write,open,getattr,ioctl -P $overlay\sepolicy
-  $SETOOLS/sepolicy-inject -s sysinit -t rootfs -c file -p execute,read,open,execute_no_trans,getattr -P $overlay\sepolicy
-  $SETOOLS/sepolicy-inject -s sysinit -t shell_exec -c file -p execute,read,open,execute_no_trans,getattr -P $overlay\sepolicy
-  $SETOOLS/sepolicy-inject -s sysinit -t zygote_exec -c file -p execute,read,open,execute_no_trans,getattr -P $overlay\sepolicy
-  $SETOOLS/sepolicy-inject -s sysinit -t toolbox_exec -c file -p getattr,open,read,ioctl,lock,getattr,execute,execute_no_trans,entrypoint -P $overlay\sepolicy
+  $SETOOLS/sepolicy-inject -z sysinit -P $overlay/sepolicy
+  $SETOOLS/sepolicy-inject -Z sysinit -P $overlay/sepolicy
+  $SETOOLS/sepolicy-inject -s init -t sysinit -c process -p transition -P $overlay/sepolicy
+  $SETOOLS/sepolicy-inject -s init -t sysinit -c process -p rlimitinh -P $overlay/sepolicy
+  $SETOOLS/sepolicy-inject -s init -t sysinit -c process -p siginh -P $overlay/sepolicy
+  $SETOOLS/sepolicy-inject -s init -t sysinit -c process -p noatsecure -P $overlay/sepolicy
+  $SETOOLS/sepolicy-inject -s sysinit -t sysinit -c dir -p search,read -P $overlay/sepolicy
+  $SETOOLS/sepolicy-inject -s sysinit -t sysinit -c file -p read,write,open -P $overlay/sepolicy
+  $SETOOLS/sepolicy-inject -s sysinit -t sysinit -c unix_dgram_socket -p create,connect,write,setopt -P $overlay/sepolicy
+  $SETOOLS/sepolicy-inject -s sysinit -t sysinit -c lnk_file -p read -P $overlay/sepolicy
+  $SETOOLS/sepolicy-inject -s sysinit -t sysinit -c process -p fork,sigchld -P $overlay/sepolicy
+  $SETOOLS/sepolicy-inject -s sysinit -t sysinit -c capability -p dac_override -P $overlay/sepolicy
+  $SETOOLS/sepolicy-inject -s sysinit -t system_file -c file -p entrypoint,execute_no_trans -P $overlay/sepolicy
+  $SETOOLS/sepolicy-inject -s sysinit -t devpts -c chr_file -p read,write,open,getattr,ioctl -P $overlay/sepolicy
+  $SETOOLS/sepolicy-inject -s sysinit -t rootfs -c file -p execute,read,open,execute_no_trans,getattr -P $overlay/sepolicy
+  $SETOOLS/sepolicy-inject -s sysinit -t shell_exec -c file -p execute,read,open,execute_no_trans,getattr -P $overlay/sepolicy
+  $SETOOLS/sepolicy-inject -s sysinit -t zygote_exec -c file -p execute,read,open,execute_no_trans,getattr -P $overlay/sepolicy
+  $SETOOLS/sepolicy-inject -s sysinit -t toolbox_exec -c file -p getattr,open,read,ioctl,lock,getattr,execute,execute_no_trans,entrypoint -P $overlay/sepolicy
 
 else
   ui_print "Removing init.d patches and sepolicy-inject..."
   rm -f sbin/sepolicy-inject sbin/sesearch sbin/seinfo
-  for FILE in $overlay\init*.rc $overlay\sepolicy /system/bin/sysinit /system/xbin/sysinit /system/bin/sepolicy-inject /system/xbin/sepolicy-inject /system/bin/seinfo /system/xbin/seinfo /system/bin/sesearch /system/xbin/sesearch $(find /system -name install-recovery.sh); do
+  for FILE in $overlay/init*.rc $overlay/sepolicy /system/bin/sysinit /system/xbin/sysinit /system/bin/sepolicy-inject /system/xbin/sepolicy-inject /system/bin/seinfo /system/xbin/seinfo /system/bin/sesearch /system/xbin/sesearch $(find /system -name install-recovery.sh); do
     restore_file $FILE
   done
 fi
