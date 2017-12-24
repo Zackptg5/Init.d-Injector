@@ -68,9 +68,8 @@ if [ "$(grep_prop ro.product.brand)" = "lge" ] || [ "$(grep_prop ro.product.bran
   esac
 fi
 
-# Pixel boot img signing support
+# Slot device support
 if [ ! -z $slot ]; then            
-  mv -f $bin/avb-signing/avb $bin/avb-signing/BootSignature_Android.jar $bin
   if [ -d $ramdisk/.subackup -o -d $ramdisk/.backup ]; then                                                                                                                                                                
     patch_cmdline "skip_override" "skip_override"
   else
