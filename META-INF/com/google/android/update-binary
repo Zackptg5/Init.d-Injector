@@ -13,14 +13,6 @@ ui_print() {
   done;
 }
 show_progress() { echo "progress $1 $2" > $OUTFD; }
-set_perm_recursive() {
-  dirs=$(echo $* | $bb awk '{ print substr($0, index($0,$5)) }');
-  for i in $dirs; do
-    $bb chown -R $1:$2 $i;
-    $bb find "$i" -type d -exec chmod $3 {} +;
-    $bb find "$i" -type f -exec chmod $4 {} +;
-  done;
-}
 file_getprop() { grep "^$2=" "$1" | cut -d= -f2; }
 getprop() { test -e /sbin/getprop && /sbin/getprop $1 || file_getprop /default.prop $1; }
 cleanup() { rm -rf /tmp/anykernel; }
@@ -83,7 +75,6 @@ mount_system() {
   ui_print " "
 }
 
-#show_progress 1.34 4;
 ui_print " ";
 cleanup;
 mkdir -p /tmp/anykernel/bin;
@@ -133,10 +124,19 @@ fi;
 
 if [ "$(file_getprop /tmp/anykernel/anykernel.sh do.modules)" == 1 ]; then
   ui_print " ";
-  ui_print "Pushing modules...";
-  $bb cp -rLf /tmp/anykernel/modules/* /system/lib/modules/;
-  set_perm_recursive 0 0 0755 0644 /system/lib/modules;
-  chcon -R 'u:object_r:system_file:s0' /system/lib/modules;
+  ui_print "Pushing modules...";                                                 
+  cd /tmp/anykernel/modules;
+  for module in $(find . -name '*.ko'); do
+    $bb cp -rLf $module /$module;
+    $bb chown 0:0 /$module;
+    $bb chmod 644 /$module;
+    case $module in
+      */vendor/*) mod=vendor;;
+      *) mod=system;;
+    esac;
+    chcon "u:object_r:${mod}_file:s0" /$module;
+  done;
+  cd /tmp/anykernel;                                          
 fi;
 
 debugging;
