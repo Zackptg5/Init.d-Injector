@@ -183,9 +183,9 @@ else
   done
 fi
 
-# end ramdisk changes
-# ui_print " "
-# ui_print "Repacking boot image..."
-# write_boot
+#end ramdisk changes
+ui_print " "
+ui_print "Repacking boot image..."
+write_boot
 
-## end install
+# end install
