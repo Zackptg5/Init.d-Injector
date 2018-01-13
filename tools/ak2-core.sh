@@ -261,7 +261,7 @@ flash_boot() {
   if [ "$(strings /tmp/anykernel/boot.img | grep SEANDROIDENFORCE )" ]; then
     printf 'SEANDROIDENFORCE' >> boot-new.img;
   fi;
-  if ($bump); then
+  if $bump; then
     echo -n -e "\x41\xa9\xe4\x67\x74\x4d\x1d\x1b\xa4\x29\xf2\xec\xea\x65\x52\x79" >> boot-new.img;
   fi;
   if [ -f "$bin/dhtbsign" ]; then
