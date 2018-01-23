@@ -18,6 +18,12 @@ ui_print() { echo -e "ui_print $1\nui_print" > $OUTFD; }
 # contains <string> <substring>
 contains() { test "${1#*$2}" != "$1" && return 0 || return 1; }
 
+# reset anykernel directory
+reset_ak() {
+  rm -rf $ramdisk $split_img /tmp/anykernel/rdtmp /tmp/anykernel/boot.img /tmp/anykernel/*-new.*;
+  . /tmp/anykernel/tools/ak2-core.sh $FD;
+}
+
 # dump boot and extract ramdisk
 split_boot() {
   if [ ! -e "$(echo $block | cut -d\  -f1)" ]; then
@@ -246,13 +252,19 @@ flash_boot() {
   fi;
   if [ -f "$bin/BootSignature_Android.jar" -a -d "$bin/avb" ]; then
     ui_print "Signing boot image..."
-    unset LD_LIBRARY_PATH;
     pk8=`ls $bin/avb/*.pk8`;
     cert=`ls $bin/avb/*.x509.*`;
-    /system/bin/dalvikvm -Xbootclasspath:/system/framework/core-oj.jar:/system/framework/core-libart.jar:/system/framework/conscrypt.jar:/system/framework/bouncycastle.jar -Xnodex2oat -Xnoimage-dex2oat -cp $bin/BootSignature_Android.jar com.android.verity.BootSignature /boot boot-new.img $pk8 $cert boot-new-signed.img;
+    case $block in
+      *recovery*|*SOS*) avbtype=recovery;;
+      *) avbtype=boot;;
+    esac;
+    savedpath="$LD_LIBRARY_PATH";
+    unset LD_LIBRARY_PATH;
+    /system/bin/dalvikvm -Xbootclasspath:/system/framework/core-oj.jar:/system/framework/core-libart.jar:/system/framework/conscrypt.jar:/system/framework/bouncycastle.jar -Xnodex2oat -Xnoimage-dex2oat -cp $bin/BootSignature_Android.jar com.android.verity.BootSignature /$avbtype boot-new.img $pk8 $cert boot-new-signed.img;
     if [ $? != 0 ]; then
       ui_print " "; ui_print "Signing image failed. Aborting..."; exit 1;
     fi;
+    test "$savedpath" && export LD_LIBRARY_PATH="$savedpath";
     mv -f boot-new-signed.img boot-new.img;
   fi;
   if [ -f "$bin/blobpack" ]; then
@@ -373,7 +385,7 @@ insert_line() {
       after) offset=1;;
     esac;
     line=$((`grep -n "$4" $1 | head -n1 | cut -d: -f1` + offset));
-    if [ "$(wc -l $1 | cut -d\  -f1)" -le "$line" ]; then
+    if [ "$(wc -l $1 | cut -d\  -f1)" -lt "$line" ]; then
       echo "$5" >> $1;
     else
       sed -i "${line}s;^;${5}\n;" $1;
@@ -454,15 +466,16 @@ patch_fstab() {
   fi;
 }
 
-# patch_cmdline <cmdline match string> [<replacement string>]
+# patch_cmdline <cmdline entry name> <replacement string>
 patch_cmdline() {
   cmdfile=`ls $split_img/*-cmdline`;
   if [ -z "$(grep "$1" $cmdfile)" ]; then
     cmdtmp=`cat $cmdfile`;
-    echo "$cmdtmp $1" > $cmdfile;
+    echo "$cmdtmp $2" > $cmdfile;
+    sed -i -e 's;  *; ;g' -e 's;[ \t]*$;;' $cmdfile;
   else
     match=$(grep -o "$1.*$" $cmdfile | cut -d\  -f1);
-    sed -i -e "s;${match};${2};" -e 's;  ; ;' -e 's;[ \t]*$;;' $cmdfile;
+    sed -i -e "s;${match};${2};" -e 's;  *; ;g' -e 's;[ \t]*$;;' $cmdfile;
   fi;
 }
 
