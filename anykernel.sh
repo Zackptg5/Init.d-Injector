@@ -63,7 +63,7 @@ list="init*.rc sepolicy"
 bump=false
 if [ "$(grep_prop ro.product.brand)" = "lge" ] || [ "$(grep_prop ro.product.brand)" = "LGE" ]; then 
   case $(grep_prop ro.product.device) in
-    d800|d801|d802|d803|ls980|vs980|101f|d850|d852|d855|ls990|vs985|f400) bump=true; ui_print "! Bump device detected !"; ui_print "! Using bump exploit !"; ui_print " ";;
+    d800|d801|d802|d803|ls980|vs980|101f|d850|d852|d855|ls990|vs985|f400) bump=true; ui_print "Bump device detected! Using bump exploit...";;
 	*) ;;
   esac
 fi
