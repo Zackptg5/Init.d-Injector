@@ -19,12 +19,12 @@ device.name5=
 # shell variables
 ramdisk_compression=auto                        
 # determine the location of the boot partition
-if [ -e /dev/block/platform/*/by-name/boot ]; then
-  block=/dev/block/platform/*/by-name/boot
-elif [ -e /dev/block/platform/*/*/by-name/boot ]; then
-  block=/dev/block/platform/*/*/by-name/boot
+if [ "$(find /dev/block -name boot | head -n 1)" ]; then
+  block=$(find /dev/block -name boot | head -n 1)
 elif [ -e /dev/block/platform/sdhci-tegra.3/by-name/LNX ]; then
   block=/dev/block/platform/sdhci-tegra.3/by-name/LNX
+else
+  abort "! Boot img not found! Aborting!"
 fi
 
 # force expansion of the path so we can use it
