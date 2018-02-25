@@ -1,55 +1,48 @@
 ## AnyKernel methods (DO NOT CHANGE)
 # set up extracted files and directories
-ramdisk=/tmp/anykernel/ramdisk;
-bin=/tmp/anykernel/tools;
-split_img=/tmp/anykernel/split_img;
-patch=/tmp/anykernel/patch;
-slot=<slot>;
-ACTION=<ACTION>;
+ramdisk=$INSTALLER/common/ak2/ramdisk;
+bin=$INSTALLER/common/ak2/tools;
+split_img=$INSTALLER/common/ak2/split_img;
+patch=$INSTALLER/common/ak2/patch;
 
 chmod -R 755 $bin;
 mkdir -p $ramdisk $split_img;
-
-OUTFD=/proc/self/fd/$1;
-
-# ui_print <text>
-ui_print() { echo -e "ui_print $1\nui_print" > $OUTFD; }
 
 # contains <string> <substring>
 contains() { test "${1#*$2}" != "$1" && return 0 || return 1; }
 
 # reset anykernel directory
 reset_ak() {
-  rm -rf $ramdisk $split_img /tmp/anykernel/rdtmp /tmp/anykernel/boot.img /tmp/anykernel/*-new.*;
-  . /tmp/anykernel/tools/ak2-core.sh $FD;
+  rm -rf $ramdisk $split_img $INSTALLER/common/ak2/rdtmp $INSTALLER/common/ak2/boot.img $INSTALLER/common/ak2/*-new.*;
+  . $INSTALLER/common/ak2/tools/ak2-core.sh $FD;
 }
 
 # dump boot and extract ramdisk
 split_boot() {
   if [ ! -e "$(echo $block | cut -d\  -f1)" ]; then
-    ui_print " "; ui_print "Invalid partition. Aborting..."; exit 1;
+    ui_print " "; abort "   ! Invalid partition!";
   fi;
   if [ -f "$bin/nanddump" ]; then
-    $bin/nanddump -f /tmp/anykernel/boot.img $block;
+    $bin/nanddump -f $INSTALLER/common/ak2/boot.img $block;
   else
-    dd if=$block of=/tmp/anykernel/boot.img;
+    dd if=$block of=$INSTALLER/common/ak2/boot.img;
   fi;
-  if [ "$(strings /tmp/anykernel/boot.img | grep -E 'Green Loader|Green Recovery')" ]; then
-    mv -f /tmp/anykernel/boot.img /tmp/anykernel/boot-orig.img;
-    dd bs=1048576 count=1 conv=notrunc if=/tmp/anykernel/boot-orig.img of=$split_img/boot.img-master_boot.key;
-    dd bs=1048576 skip=1 conv=notrunc if=/tmp/anykernel/boot-orig.img of=/tmp/anykernel/boot.img;
+  if [ "$(strings $INSTALLER/common/ak2/boot.img | grep -E 'Green Loader|Green Recovery')" ]; then
+    mv -f $INSTALLER/common/ak2/boot.img $INSTALLER/common/ak2/boot-orig.img;
+    dd bs=1048576 count=1 conv=notrunc if=$INSTALLER/common/ak2/boot-orig.img of=$split_img/boot.img-master_boot.key;
+    dd bs=1048576 skip=1 conv=notrunc if=$INSTALLER/common/ak2/boot-orig.img of=$INSTALLER/common/ak2/boot.img;
   fi;
-  if [ -f "$bin/unpackelf" -a "$($bin/unpackelf -i /tmp/anykernel/boot.img -h -q 2>/dev/null; echo $?)" == 0 ]; then
+  if [ -f "$bin/unpackelf" -a "$($bin/unpackelf -i $INSTALLER/common/ak2/boot.img -h -q 2>/dev/null; echo $?)" == 0 ]; then
     if [ -f "$bin/elftool" ]; then
       mkdir $split_img/elftool_out;
-      $bin/elftool unpack -i /tmp/anykernel/boot.img -o $split_img/elftool_out;
+      $bin/elftool unpack -i $INSTALLER/common/ak2/boot.img -o $split_img/elftool_out;
       cp -f $split_img/elftool_out/header $split_img/boot.img-header;
     fi;                  
-    $bin/unpackelf -i /tmp/anykernel/boot.img -o $split_img;
+    $bin/unpackelf -i $INSTALLER/common/ak2/boot.img -o $split_img;
     mv -f $split_img/boot.img-ramdisk.cpio.gz $split_img/boot.img-ramdisk.gz;
   elif [ -f "$bin/dumpimage" ]; then
-    $bin/dumpimage -l /tmp/anykernel/boot.img;
-    $bin/dumpimage -l /tmp/anykernel/boot.img > $split_img/boot.img-header;
+    $bin/dumpimage -l $INSTALLER/common/ak2/boot.img;
+    $bin/dumpimage -l $INSTALLER/common/ak2/boot.img > $split_img/boot.img-header;
     grep "Name:" $split_img/boot.img-header | cut -c15- > $split_img/boot.img-name;
     grep "Type:" $split_img/boot.img-header | cut -c15- | cut -d\  -f1 > $split_img/boot.img-arch;
     grep "Type:" $split_img/boot.img-header | cut -c15- | cut -d\  -f2 > $split_img/boot.img-os;
@@ -57,21 +50,21 @@ split_boot() {
     grep "Type:" $split_img/boot.img-header | cut -d\( -f2 | cut -d\) -f1 | cut -d\  -f1 | cut -d- -f1 > $split_img/boot.img-comp;
     grep "Address:" $split_img/boot.img-header | cut -c15- > $split_img/boot.img-addr;
     grep "Point:" $split_img/boot.img-header | cut -c15- > $split_img/boot.img-ep;
-    $bin/dumpimage -i /tmp/anykernel/boot.img -p 0 $split_img/boot.img-zImage;
+    $bin/dumpimage -i $INSTALLER/common/ak2/boot.img -p 0 $split_img/boot.img-zImage;
     test $? != 0 && dumpfail=1;
     if [ "$(cat $split_img/boot.img-type)" == "Multi" ]; then
-      $bin/dumpimage -i /tmp/anykernel/boot.img -p 1 $split_img/boot.img-ramdisk.gz;
+      $bin/dumpimage -i $INSTALLER/common/ak2/boot.img -p 1 $split_img/boot.img-ramdisk.gz;
     fi;
     test $? != 0 && dumpfail=1;                           
   elif [ -f "$bin/rkcrc" ]; then
-    dd bs=4096 skip=8 iflag=skip_bytes conv=notrunc if=/tmp/anykernel/boot.img of=$split_img/boot.img-ramdisk.gz;
+    dd bs=4096 skip=8 iflag=skip_bytes conv=notrunc if=$INSTALLER/common/ak2/boot.img of=$split_img/boot.img-ramdisk.gz;
   elif [ -f "$bin/pxa-unpackbootimg" ]; then
-    $bin/pxa-unpackbootimg -i /tmp/anykernel/boot.img -o $split_img;
+    $bin/pxa-unpackbootimg -i $INSTALLER/common/ak2/boot.img -o $split_img;
   else
-    $bin/unpackbootimg -i /tmp/anykernel/boot.img -o $split_img;
+    $bin/unpackbootimg -i $INSTALLER/common/ak2/boot.img -o $split_img;
   fi;
   if [ $? != 0 -o "$dumpfail" ]; then
-    ui_print " "; ui_print "Dumping/splitting image failed. Aborting..."; exit 1;
+    ui_print " "; abort "   ! Dumping/splitting image failed!";
   fi;
   if [ -f "$bin/unpackelf" -a -f "$split_img/boot.img-dtb" ]; then
     case $(od -ta -An -N4 $split_img/boot.img-dtb | sed -e 's/del //' -e 's/   //g') in
@@ -88,7 +81,7 @@ unpack_ramdisk() {
     dd bs=512 skip=1 conv=notrunc if=$split_img/boot.img-ramdisk.gz of=$split_img/temprd;
     mv -f $split_img/temprd $split_img/boot.img-ramdisk.gz;
   fi;
-  mv -f $ramdisk /tmp/anykernel/rdtmp;
+  mv -f $ramdisk $INSTALLER/common/ak2/rdtmp;
    case $(od -ta -An -N4 $split_img/boot.img-ramdisk.gz) in
     '  us  vt'*|'  us  rs'*) compext="gz"; unpackcmd="gzip";;
     '  ht   L   Z   O') compext="lzo"; unpackcmd="lzop";;
@@ -97,7 +90,7 @@ unpack_ramdisk() {
     '   B   Z   h'*) compext="bz2"; unpackcmd="bzip2";;
     ' stx   !   L can') compext="lz4-l"; unpackcmd="$bin/lz4";;
     ' etx   !   L can'|' eot   "   M can') compext="lz4"; unpackcmd="$bin/lz4";;
-    *) ui_print " "; ui_print "Unknown ramdisk compression. Aborting..."; exit 1;;
+    *) ui_print " "; abort "   ! Unknown ramdisk compression!";
   esac;
   mv -f $split_img/boot.img-ramdisk.gz $split_img/boot.img-ramdisk.cpio.$compext;
   mkdir -p $ramdisk;                 
@@ -105,9 +98,9 @@ unpack_ramdisk() {
   cd $ramdisk;
   $unpackcmd -dc $split_img/boot.img-ramdisk.cpio.$compext | cpio -i -d;
   if [ $? != 0 -o -z "$(ls $ramdisk)" ]; then
-    ui_print " "; ui_print "Unpacking ramdisk failed. Aborting..."; exit 1;
+    ui_print " "; abort "   ! Unpacking ramdisk failed!";
   fi;
-  test ! -z "$(ls /tmp/anykernel/rdtmp)" && cp -af /tmp/anykernel/rdtmp/* $ramdisk;
+  test ! -z "$(ls $INSTALLER/common/ak2/rdtmp)" && cp -af $INSTALLER/common/ak2/rdtmp/* $ramdisk;
   rm -f $ramdisk/placeholder
 }
 dump_boot() {
@@ -131,15 +124,15 @@ repack_ramdisk() {
     lz4) repackcmd="$bin/lz4";;
   esac;
   if [ -f "$bin/mkbootfs" ]; then
-    $bin/mkbootfs $ramdisk | $repackcmd -9c > /tmp/anykernel/ramdisk-new.cpio.$compext;
+    $bin/mkbootfs $ramdisk | $repackcmd -9c > $INSTALLER/common/ak2/ramdisk-new.cpio.$compext;
   else
     cd $ramdisk;
-    find . | cpio -H newc -o | $repackcmd -9c > /tmp/anykernel/ramdisk-new.cpio.$compext;
+    find . | cpio -H newc -o | $repackcmd -9c > $INSTALLER/common/ak2/ramdisk-new.cpio.$compext;
   fi;
   if [ $? != 0 ]; then
-    ui_print " "; ui_print "Repacking ramdisk failed. Aborting..."; exit 1;
+    ui_print " "; abort "   ! Repacking ramdisk failed!";
   fi;
-  cd /tmp/anykernel;
+  cd $INSTALLER/common/ak2;
   if [ -f "$bin/mkmtkhdr" ]; then
     $bin/mkmtkhdr --rootfs ramdisk-new.cpio.$compext;
     mv -f ramdisk-new.cpio.$compext-mtk ramdisk-new.cpio.$compext;
@@ -192,8 +185,8 @@ flash_boot() {
     fi;
   fi;
   for i in zImage zImage-dtb Image.gz Image Image-dtb Image.gz-dtb Image.bz2 Image.bz2-dtb Image.lzo Image.lzo-dtb Image.lzma Image.lzma-dtb Image.xz Image.xz-dtb Image.lz4 Image.lz4-dtb Image.fit; do
-    if [ -f /tmp/anykernel/$i ]; then
-      kernel=/tmp/anykernel/$i;
+    if [ -f $INSTALLER/common/ak2/$i ]; then
+      kernel=$INSTALLER/common/ak2/$i;
       break;
     fi;
   done;
@@ -201,16 +194,16 @@ flash_boot() {
     kernel=`ls *-zImage`;
     kernel=$split_img/$kernel;
   fi;
-  if [ -f /tmp/anykernel/ramdisk-new.cpio.$compext ]; then
-    rd=/tmp/anykernel/ramdisk-new.cpio.$compext;
+  if [ -f $INSTALLER/common/ak2/ramdisk-new.cpio.$compext ]; then
+    rd=$INSTALLER/common/ak2/ramdisk-new.cpio.$compext;
   else
     rd=`ls *-ramdisk.*`;
     rd="$split_img/$rd";
   fi;    
   for i in dtb dt.img; do
-    if [ -f /tmp/anykernel/$i ]; then
-      dtb="--dt /tmp/anykernel/$i";
-      rpm="/tmp/anykernel/$i,rpm";                            
+    if [ -f $INSTALLER/common/ak2/$i ]; then
+      dtb="--dt $INSTALLER/common/ak2/$i";
+      rpm="$INSTALLER/common/ak2/$i,rpm";                            
       break;
     fi;
   done;
@@ -219,7 +212,7 @@ flash_boot() {
     dtb="--dt $split_img/$dtb";
     rpm="$split_img/$dtb,rpm";                          
   fi;
-  cd /tmp/anykernel;
+  cd $INSTALLER/common/ak2;
   if [ -f "$bin/mkmtkhdr" ]; then
     case $kernel in
       $split_img/*) ;;
@@ -239,19 +232,19 @@ flash_boot() {
     $bin/mkbootimg --kernel $kernel --ramdisk $rd $second --cmdline "$cmdline" --board "$board" --base $base --pagesize $pagesize --kernel_offset $kerneloff --ramdisk_offset $ramdiskoff $secondoff --tags_offset "$tagsoff" --os_version "$osver" --os_patch_level "$oslvl" $hash $dtb --output boot-new.img;
   fi;
   if [ $? != 0 ]; then
-    ui_print " "; ui_print "Repacking image failed. Aborting..."; exit 1;
+    ui_print " "; abort "   ! Repacking image failed!";
   elif [ "$(wc -c < boot-new.img)" -gt "$(wc -c < boot.img)" ]; then
-    ui_print " "; ui_print "New image larger than boot partition. Aborting..."; exit 1;
+    ui_print " "; abort "   ! New image larger than boot partition!";
   fi;
   if [ -f "$bin/futility" -a -d "$bin/chromeos" ]; then
     $bin/futility vbutil_kernel --pack boot-new-signed.img --keyblock $bin/chromeos/kernel.keyblock --signprivate $bin/chromeos/kernel_data_key.vbprivk --version 1 --vmlinuz boot-new.img --bootloader $bin/chromeos/empty --config $bin/chromeos/empty --arch arm --flags 0x1;
     if [ $? != 0 ]; then
-      ui_print " "; ui_print "Signing image failed. Aborting..."; exit 1;
+      ui_print " "; abort "   ! Signing image failed!";
     fi;
     mv -f boot-new-signed.img boot-new.img;
   fi;
   if [ -f "$bin/BootSignature_Android.jar" -a -d "$bin/avb" ]; then
-    ui_print "Signing boot image..."
+    ui_print "   Signing boot image..."
     pk8=`ls $bin/avb/*.pk8`;
     cert=`ls $bin/avb/*.x509.*`;
     case $block in
@@ -262,7 +255,7 @@ flash_boot() {
     unset LD_LIBRARY_PATH;
     /system/bin/dalvikvm -Xbootclasspath:/system/framework/core-oj.jar:/system/framework/core-libart.jar:/system/framework/conscrypt.jar:/system/framework/bouncycastle.jar -Xnodex2oat -Xnoimage-dex2oat -cp $bin/BootSignature_Android.jar com.android.verity.BootSignature /$avbtype boot-new.img $pk8 $cert boot-new-signed.img;
     if [ $? != 0 ]; then
-      ui_print " "; ui_print "Signing image failed. Aborting..."; exit 1;
+      ui_print " "; abort "   ! Signing image failed!";
     fi;
     test "$savedpath" && export LD_LIBRARY_PATH="$savedpath";
     mv -f boot-new-signed.img boot-new.img;
@@ -274,15 +267,16 @@ flash_boot() {
     mv -f boot-new-signed.img boot-new.img;
   fi;
   if [ -f "/data/custom_boot_image_patch.sh" ]; then
-    ash /data/custom_boot_image_patch.sh /tmp/anykernel/boot-new.img;
+    ash /data/custom_boot_image_patch.sh $INSTALLER/common/ak2/boot-new.img;
     if [ $? != 0 ]; then
-      ui_print " "; ui_print "User script execution failed. Aborting..."; exit 1;
+      ui_print " "; abort "   ! User script execution failed!";
     fi;
   fi;
-  if [ "$(strings /tmp/anykernel/boot.img | grep SEANDROIDENFORCE )" ]; then
+  if [ "$(strings $INSTALLER/common/ak2/boot.img | grep SEANDROIDENFORCE )" ]; then
     printf 'SEANDROIDENFORCE' >> boot-new.img;
   fi;
   if $bump; then
+    ui_print "   Bump device detected! Using bump exploit..."
     echo -n -e "\x41\xa9\xe4\x67\x74\x4d\x1d\x1b\xa4\x29\xf2\xec\xea\x65\x52\x79" >> boot-new.img;
   fi;
   if [ -f "$bin/dhtbsign" ]; then
@@ -293,33 +287,33 @@ flash_boot() {
     cat $split_img/boot.img-master_boot.key boot-new.img > boot-new-signed.img;
     mv -f boot-new-signed.img boot-new.img;
   fi;
-  if [ ! -f /tmp/anykernel/boot-new.img ]; then
-    ui_print " "; ui_print "Repacked image could not be found. Aborting..."; exit 1;
+  if [ ! -f $INSTALLER/common/ak2/boot-new.img ]; then
+    ui_print " "; abort "   ! Repacked image could not be found!";
   fi;  
   if [ -f "$bin/flash_erase" -a -f "$bin/nandwrite" ]; then
     $bin/flash_erase $block 0 0;
-    $bin/nandwrite -p $block /tmp/anykernel/boot-new.img;
+    $bin/nandwrite -p $block $INSTALLER/common/ak2/boot-new.img;
   else
     dd if=/dev/zero of=$block 2>/dev/null;
-    dd if=/tmp/anykernel/boot-new.img of=$block;
+    dd if=$INSTALLER/common/ak2/boot-new.img of=$block;
   fi;
   for i in dtbo dtbo.img; do
-    if [ -f /tmp/anykernel/$i ]; then
+    if [ -f $INSTALLER/common/ak2/$i ]; then
       dtbo=$i;
       break;
     fi;
   done;
   if [ "$dtbo" ]; then
-    dtbo_block=/dev/block/bootdevice/by-name/dtbo$slot;
+    dtbo_block=/dev/block/bootdevice/by-name/dtbo$SLOT;
     if [ ! -e "$(echo $dtbo_block)" ]; then
-      ui_print " "; ui_print "dtbo partition could not be found. Aborting..."; exit 1;
+      ui_print " "; abort "   ! dtbo partition could not be found!";
     fi;
     if [ -f "$bin/flash_erase" -a -f "$bin/nandwrite" ]; then
       $bin/flash_erase $dtbo_block 0 0;
-      $bin/nandwrite -p $dtbo_block /tmp/anykernel/$dtbo;
+      $bin/nandwrite -p $dtbo_block $INSTALLER/common/ak2/$dtbo;
     else
       dd if=/dev/zero of=$dtbo_block 2>/dev/null;
-      dd if=/tmp/anykernel/$dtbo of=$dtbo_block;
+      dd if=$INSTALLER/common/ak2/$dtbo of=$dtbo_block;
     fi;
   fi;
 }
@@ -491,7 +485,5 @@ patch_prop() {
 
 # grep_prop <prop name>
 grep_prop() { grep "^$1" "/system/build.prop" | cut -d= -f2; }
-
-device_check() { test "$(getprop ro.product.device)" == "$1" -o "$(getprop ro.build.product)" == "$1" && return 0 || return 1; } 
 
 ## end methods

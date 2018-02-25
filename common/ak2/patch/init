@@ -5,8 +5,3 @@ service sysinit /system/bin/logwrapper /system/bin/sysinit
     user root
     group root
     oneshot
-    disabled
-
-on property:sys.boot_completed=1
-    start sysinit
-# end init.d patch
