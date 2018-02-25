@@ -33,7 +33,7 @@ PROPFILE=false
 POSTFSDATA=true
 
 # Set to true if you need late_start service script
-LATESTARTSERVICE=false
+LATESTARTSERVICE=true
 
 # Unity Variables
 # Uncomment and change 'MINAPI' and 'MAXAPI' to the minimum and maxium android version for your mod (note that magisk has it's own minimum api: 21 (lollipop))
@@ -97,10 +97,7 @@ set_permissions() {
   $MAGISK && set_perm_recursive $MODPATH 0 0 0755 0644
  
   # CUSTOM PERMISSIONS
-  if ! $MAGISK; then
-    set_perm $UNITY$SYS/bin/debuggerd 0 2000 0755
-    set_perm $UNITY$SYS/bin/debuggerd.real 0 2000 0755
-  fi
+  $MAGISK || set_perm $UNITY$SYS/bin/sysinit 0 2000 0755
   set_perm_recursive $UNITY$SYS/etc/init.d 0 0 0755 0755
   
   # Some templates if you have no idea what to do:
