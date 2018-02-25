@@ -29,3 +29,4 @@ CHECKPART="/data/INITD" # This is the check-file, must be the same here and in t
 # Core
 touch "$CHECKPART"
 exit 0
+

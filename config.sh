@@ -97,8 +97,10 @@ set_permissions() {
   $MAGISK && set_perm_recursive $MODPATH 0 0 0755 0644
  
   # CUSTOM PERMISSIONS
-  set_perm $UNITY$SYS/bin/debuggerd 0 2000 0755
-  set_perm $UNITY$SYS/bin/debuggerd.real 0 2000 0755
+  if ! $MAGISK; then
+    set_perm $UNITY$SYS/bin/debuggerd 0 2000 0755
+    set_perm $UNITY$SYS/bin/debuggerd.real 0 2000 0755
+  fi
   set_perm_recursive $UNITY$SYS/etc/init.d 0 0 0755 0755
   
   # Some templates if you have no idea what to do:

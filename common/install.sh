@@ -1,4 +1,11 @@
-if [ "$MODPATH" == "/system/etc/init.d" ]; then
+if $MAGISK; then
+  POSTFSDATA=false
+  rm -rf $INSTALLER/system/bin
+  cp_ch_nb $INSTALLER/common/post-fs-data2.sh $MOUNTPATH/.core/post-fs-data.d/0000InitdInjector.sh 0755
+  patch_script $MOUNTPATH/.core/post-fs-data.d/0000InitdInjector.sh
+  cp_ch_nb $INSTALLER/common/service.sh $MOUNTPATH/.core/service.d/0000InitdInjector.sh 0755
+  patch_script $MOUNTPATH/.core/service.d/0000InitdInjector.sh
+elif [ "$MODPATH" == "/system/etc/init.d" ]; then
   ui_print "   Using Anykernel2 by osm0sis @ xda-developers"
   rm -f $INFO
   sed -i -e "s|<INSTALLER>|$INSTALLER|" -e "s|<OUTFD>|$OUTFD|" -e "s|<BOOTMODE>|$BOOTMODE|" $INSTALLER/common/ak2/anykernel.sh
