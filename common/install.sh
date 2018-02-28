@@ -1,3 +1,4 @@
+mkdir -p $UNITY/system/etc/init.d
 if [ "$MODPATH" == "/system/etc/init.d" ]; then
   ui_print "   Using Anykernel2 by osm0sis @ xda-developers"
   rm -f $INFO

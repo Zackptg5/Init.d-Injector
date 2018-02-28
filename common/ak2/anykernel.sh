@@ -125,9 +125,6 @@ if [ -z $ACTION ]; then
   
   [ "$(find /system -name install-recovery.sh)" ] && { ui_print "   Removing init.d logic from install-recovery.sh..."; backup_file $(find /system -name install-recovery.sh); sed -i '/init.d/d' $(find /system -name install-recovery.sh); }
   
-  # create init.d directory
-  test ! -d /system/etc/init.d && { test -f /system/etc/init.d && rm -f /system/etc/init.d; mkdir /system/etc/init.d; }
-  
   # add proper init.d patch
   backup_file $overlay/init.rc
   ui_print "   Patching init files..."
