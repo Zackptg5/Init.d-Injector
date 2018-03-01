@@ -96,7 +96,7 @@ unpack_ramdisk() {
   mkdir -p $ramdisk;                 
   chmod 755 $ramdisk;
   cd $ramdisk;
-  $unpackcmd -dc $split_img/boot.img-ramdisk.cpio.$compext | cpio -i -d;
+  $unpackcmd -dc $split_img/boot.img-ramdisk.cpio.$compext | EXTRACT_UNSAFE_SYMLINKS=1 cpio -i -d;
   if [ $? != 0 -o -z "$(ls $ramdisk)" ]; then
     ui_print " "; abort "   ! Unpacking ramdisk failed!";
   fi;
@@ -209,8 +209,8 @@ flash_boot() {
   done;
   if [ ! "$dtb" -a -f *-dtb ]; then
     dtb=`ls *-dtb`;
-    dtb="--dt $split_img/$dtb";
     rpm="$split_img/$dtb,rpm";                          
+    dtb="--dt $split_img/$dtb";
   fi;
   cd $INSTALLER/common/ak2;
   if [ -f "$bin/mkmtkhdr" ]; then
@@ -379,7 +379,7 @@ insert_line() {
       after) offset=1;;
     esac;
     line=$((`grep -n "$4" $1 | head -n1 | cut -d: -f1` + offset));
-    if [ "$(wc -l $1 | cut -d\  -f1)" -lt "$line" ]; then
+    if [ -f $1 ] && [ "$(wc -l $1 | cut -d\  -f1)" -lt "$line" ]; then
       echo "$5" >> $1;
     else
       sed -i "${line}s;^;${5}\n;" $1;
