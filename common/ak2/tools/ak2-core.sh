@@ -103,10 +103,51 @@ unpack_ramdisk() {
   test ! -z "$(ls $INSTALLER/common/ak2/rdtmp)" && cp -af $INSTALLER/common/ak2/rdtmp/* $ramdisk;
   rm -f $ramdisk/placeholder
 }
+signedboot_check() {
+  # Detect if boot.img is signed - credits to chainfire @xda-developers
+  unset LD_LIBRARY_PATH
+  BOOTSIGNATURE="/system/bin/dalvikvm -Xbootclasspath:/system/framework/core-oj.jar:/system/framework/core-libart.jar:/system/framework/conscrypt.jar:/system/framework/bouncycastle.jar -Xnodex2oat -Xnoimage-dex2oat -cp $bin/avb-signing/BootSignature_Android.jar com.android.verity.BootSignature"
+  if [ ! -f "/system/bin/dalvikvm" ]; then
+    # if we don't have dalvikvm, we want the same behavior as boot.art/oat not found
+    RET="initialize runtime"
+  else
+    RET=$($BOOTSIGNATURE -verify /tmp/anykernel/boot.img 2>&1)
+  fi
+  test ! -z $slot && RET=$($BOOTSIGNATURE -verify /tmp/anykernel/boot.img 2>&1)
+  if (`echo $RET | grep "VALID" >/dev/null 2>&1`); then
+    ui_print "Signed boot img detected!"
+    mv -f $bin/avb-signing/avb $bin/avb-signing/BootSignature_Android.jar $bin
+  fi
+}
 dump_boot() {
   split_boot;
   unpack_ramdisk;
-}            
+  signedboot_check;
+}         
+
+# Slot device support
+slot_device() {
+  if [ ! -z $slot ]; then           
+    if [ -d $ramdisk/.subackup -o -d $ramdisk/.backup ]; then
+      patch_cmdline "skip_override" "skip_override"
+    else
+      patch_cmdline "skip_override" ""
+    fi
+    # Overlay stuff
+    if [ -d $ramdisk/.backup ]; then
+      overlay=$ramdisk/overlay
+    elif [ -d $ramdisk/.subackup ]; then
+      overlay=$ramdisk/boot
+    fi
+    for rdfile in $list; do
+      rddir=$(dirname $rdfile)
+      mkdir -p $overlay/$rddir
+      test ! -f $overlay/$rdfile && cp -rp /system/$rdfile $overlay/$rddir/
+    done                       
+  else
+    overlay=$ramdisk
+  fi
+}
 
 # repack ramdisk then build and write image
 repack_ramdisk() {
@@ -275,9 +316,11 @@ flash_boot() {
   if [ "$(strings $INSTALLER/common/ak2/boot.img | grep SEANDROIDENFORCE )" ]; then
     printf 'SEANDROIDENFORCE' >> boot-new.img;
   fi;
-  if $bump; then
-    ui_print "   Bump device detected! Using bump exploit..."
-    echo -n -e "\x41\xa9\xe4\x67\x74\x4d\x1d\x1b\xa4\x29\xf2\xec\xea\x65\x52\x79" >> boot-new.img;
+  if [ "$(grep_prop ro.product.brand)" == "lge" ] || [ "$(grep_prop ro.product.brand)" == "LGE" ]; then 
+    case $(grep_prop ro.product.device) in
+      d800|d801|d802|d803|ls980|vs980|101f|d850|d852|d855|ls990|vs985|f400) echo -n -e "\x41\xa9\xe4\x67\x74\x4d\x1d\x1b\xa4\x29\xf2\xec\xea\x65\x52\x79" >> boot-new.img;;
+    *) ;;
+    esac
   fi;
   if [ -f "$bin/dhtbsign" ]; then
     $bin/dhtbsign -i boot-new.img -o boot-new-signed.img;

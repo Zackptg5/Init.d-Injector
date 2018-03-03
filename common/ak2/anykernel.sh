@@ -57,51 +57,8 @@ dump_boot
 # File list
 list="init*.rc sepolicy"
 
-# LG Bump Boot img support (credits to Drgravy @xda-developers)
-bump=false
-if [ "$(grep_prop ro.product.brand)" = "lge" ] || [ "$(grep_prop ro.product.brand)" = "LGE" ]; then 
-  case $(grep_prop ro.product.device) in
-    d800|d801|d802|d803|ls980|vs980|101f|d850|d852|d855|ls990|vs985|f400) bump=true;;
-	*) ;;
-  esac
-fi
-
-# Slot device support
-if [ ! -z $SLOT ]; then            
-  if [ -d $ramdisk/.subackup -o -d $ramdisk/.backup ]; then                                                                                                                                                                
-    patch_cmdline "skip_override" "skip_override"
-  else
-    patch_cmdline "skip_override" ""
-  fi
-  # Overlay stuff
-  if [ -d $ramdisk/.backup ]; then
-    overlay=$ramdisk/overlay
-  elif [ -d $ramdisk/.subackup ]; then
-    overlay=$ramdisk/boot
-  fi
-  for rdfile in $list; do
-    rddir=$(dirname $rdfile)
-    mkdir -p $overlay/$rddir
-    test ! -f $overlay/$rdfile && cp -rp /system/$rdfile $overlay/$rddir/
-  done
-else
-  overlay=$ramdisk
-fi
-
-# Detect if boot.img is signed - credits to chainfire @xda-developers
-unset LD_LIBRARY_PATH
-BOOTSIGNATURE="/system/bin/dalvikvm -Xbootclasspath:/system/framework/core-oj.jar:/system/framework/core-libart.jar:/system/framework/conscrypt.jar:/system/framework/bouncycastle.jar -Xnodex2oat -Xnoimage-dex2oat -cp $bin/avb-signing/BootSignature_Android.jar com.android.verity.BootSignature"
-if [ ! -f "/system/bin/dalvikvm" ]; then
-  # if we don't have dalvikvm, we want the same behavior as boot.art/oat not found
-  RET="initialize runtime"
-else
-  RET=$($BOOTSIGNATURE -verify $INSTALLER/common/ak2/boot.img 2>&1)
-fi
-test ! -z $SLOT && RET=$($BOOTSIGNATURE -verify $INSTALLER/common/ak2/boot.img 2>&1)
-if (`echo $RET | grep "VALID" >/dev/null 2>&1`); then
-  ui_print "   Signed boot img detected!"
-  mv -f $bin/avb-signing/avb $bin/avb-signing/BootSignature_Android.jar $bin
-fi
+## AnyKernel Slot device support
+slot_device
 
 # determine install or uninstall
 test "$(grep "ZIndicator" $overlay/init.rc)" && ACTION=Uninstall
