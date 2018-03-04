@@ -2,7 +2,7 @@
 
 export PATH=/sbin:/system/sbin:/system/bin:/system/xbin
 for i in /system/etc/init.d/*; do
-  if [ -x $i ] && [ "$i" != "/system/etc/init.d/0000liveboot" ]; then
+  if [ -x $i ] && [ "$(basename $i)" != "0000liveboot" ]; then
     /system/bin/log -t sysinit Running $i
     $i &
   fi
