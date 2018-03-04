@@ -3,7 +3,11 @@ if [ "$MODPATH" == "/system/etc/init.d" ]; then
   ui_print "   Using Anykernel2 by osm0sis @ xda-developers"
   rm -f $INFO
   sed -i -e "s|<INSTALLER>|$INSTALLER|" -e "s|<OUTFD>|$OUTFD|" -e "s|<BOOTMODE>|$BOOTMODE|" $INSTALLER/common/ak2/anykernel.sh
-  if [ -z $SLOT ]; then sed -i "/<SLOT>/d" $INSTALLER/common/ak2/anykernel.sh; else sed -i "s|<SLOT>|$SLOT|" $INSTALLER/common/ak2/anykernel.sh; fi
+  if [ -z $SLOT ]; then 
+    sed -i "/<SLOT>/d" $INSTALLER/common/ak2/anykernel.sh
+  else
+    sed -i "s|<SLOT>|$SLOT|" $INSTALLER/common/ak2/anykernel.sh
+  fi
   mkdir -p $INSTALLER/common/ak2/bin
   cd $INSTALLER/common/ak2
   case $ABILONG in
@@ -11,7 +15,7 @@ if [ "$MODPATH" == "/system/etc/init.d" ]; then
     arm*) BBABI=arm;;
     x86_64*) BBABI=x86_64;;
     x86*) BBABI=x86;;
-    mips64* BBABI=mips64;;
+    mips64*) BBABI=mips64;;
     mips*) BBABI=mips;;
     *) $MAGISK && rm -rf $MODPATH; abort "Unknown architecture: $ABILONG";;
   esac
