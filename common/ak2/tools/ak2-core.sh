@@ -8,6 +8,8 @@ patch=$INSTALLER/common/ak2/patch;
 chmod -R 755 $bin;
 mkdir -p $ramdisk $split_img;
 
+FD=$1;
+     
 # contains <string> <substring>
 contains() { test "${1#*$2}" != "$1" && return 0 || return 1; }
 
@@ -17,6 +19,45 @@ reset_ak() {
   . $INSTALLER/common/ak2/tools/ak2-core.sh $FD;
 }
 
+# Slot device support
+slot_device() {
+  if [ ! -z $slot ]; then           
+    if [ -d $ramdisk/.subackup -o -d $ramdisk/.backup ]; then
+      patch_cmdline "skip_override" "skip_override"
+    else
+      patch_cmdline "skip_override" ""
+    fi
+    # Overlay stuff
+    if [ -d $ramdisk/.backup ]; then
+      overlay=$ramdisk/overlay
+    elif [ -d $ramdisk/.subackup ]; then
+      overlay=$ramdisk/boot
+    fi
+    for rdfile in $list; do
+      rddir=$(dirname $rdfile)
+      mkdir -p $overlay/$rddir
+      test ! -f $overlay/$rdfile && cp -rp /system/$rdfile $overlay/$rddir/
+    done                       
+  else
+    overlay=$ramdisk
+  fi
+}
+# Detect if boot.img is signed - credits to chainfire @xda-developers
+signedboot_check() {
+  unset LD_LIBRARY_PATH
+  BOOTSIGNATURE="/system/bin/dalvikvm -Xbootclasspath:/system/framework/core-oj.jar:/system/framework/core-libart.jar:/system/framework/conscrypt.jar:/system/framework/bouncycastle.jar -Xnodex2oat -Xnoimage-dex2oat -cp $bin/avb-signing/BootSignature_Android.jar com.android.verity.BootSignature"
+  if [ ! -f "/system/bin/dalvikvm" ]; then
+    # if we don't have dalvikvm, we want the same behavior as boot.art/oat not found
+    RET="initialize runtime"
+  else
+    RET=$($BOOTSIGNATURE -verify /tmp/anykernel/boot.img 2>&1)
+  fi
+  test ! -z $slot && RET=$($BOOTSIGNATURE -verify /tmp/anykernel/boot.img 2>&1)
+  if (`echo $RET | grep "VALID" >/dev/null 2>&1`); then
+    ui_print "Signed boot img detected!"
+    SIGNED=true
+  fi
+}
 # dump boot and extract ramdisk
 split_boot() {
   if [ ! -e "$(echo $block | cut -d\  -f1)" ]; then
@@ -81,6 +122,7 @@ unpack_ramdisk() {
     dd bs=512 skip=1 conv=notrunc if=$split_img/boot.img-ramdisk.gz of=$split_img/temprd;
     mv -f $split_img/temprd $split_img/boot.img-ramdisk.gz;
   fi;
+  rm -f $ramdisk/placeholder
   mv -f $ramdisk $INSTALLER/common/ak2/rdtmp;
    case $(od -ta -An -N4 $split_img/boot.img-ramdisk.gz) in
     '  us  vt'*|'  us  rs'*) compext="gz"; unpackcmd="gzip";;
@@ -101,52 +143,12 @@ unpack_ramdisk() {
     ui_print " "; abort "   ! Unpacking ramdisk failed!";
   fi;
   test ! -z "$(ls $INSTALLER/common/ak2/rdtmp)" && cp -af $INSTALLER/common/ak2/rdtmp/* $ramdisk;
-  rm -f $ramdisk/placeholder
-}
-signedboot_check() {
-  # Detect if boot.img is signed - credits to chainfire @xda-developers
-  unset LD_LIBRARY_PATH
-  BOOTSIGNATURE="/system/bin/dalvikvm -Xbootclasspath:/system/framework/core-oj.jar:/system/framework/core-libart.jar:/system/framework/conscrypt.jar:/system/framework/bouncycastle.jar -Xnodex2oat -Xnoimage-dex2oat -cp $bin/avb-signing/BootSignature_Android.jar com.android.verity.BootSignature"
-  if [ ! -f "/system/bin/dalvikvm" ]; then
-    # if we don't have dalvikvm, we want the same behavior as boot.art/oat not found
-    RET="initialize runtime"
-  else
-    RET=$($BOOTSIGNATURE -verify /tmp/anykernel/boot.img 2>&1)
-  fi
-  test ! -z $slot && RET=$($BOOTSIGNATURE -verify /tmp/anykernel/boot.img 2>&1)
-  if (`echo $RET | grep "VALID" >/dev/null 2>&1`); then
-    ui_print "Signed boot img detected!"
-    mv -f $bin/avb-signing/avb $bin/avb-signing/BootSignature_Android.jar $bin
-  fi
 }
 dump_boot() {
+  slot_device;
+  signedboot_check;
   split_boot;
   unpack_ramdisk;
-  signedboot_check;
-}         
-
-# Slot device support
-slot_device() {
-  if [ ! -z $slot ]; then           
-    if [ -d $ramdisk/.subackup -o -d $ramdisk/.backup ]; then
-      patch_cmdline "skip_override" "skip_override"
-    else
-      patch_cmdline "skip_override" ""
-    fi
-    # Overlay stuff
-    if [ -d $ramdisk/.backup ]; then
-      overlay=$ramdisk/overlay
-    elif [ -d $ramdisk/.subackup ]; then
-      overlay=$ramdisk/boot
-    fi
-    for rdfile in $list; do
-      rddir=$(dirname $rdfile)
-      mkdir -p $overlay/$rddir
-      test ! -f $overlay/$rdfile && cp -rp /system/$rdfile $overlay/$rddir/
-    done                       
-  else
-    overlay=$ramdisk
-  fi
 }
 
 # repack ramdisk then build and write image
@@ -284,7 +286,7 @@ flash_boot() {
     fi;
     mv -f boot-new-signed.img boot-new.img;
   fi;
-  if [ -f "$bin/BootSignature_Android.jar" -a -d "$bin/avb" ]; then
+  if [ ! -z $SIGNED ]; then
     ui_print "   Signing boot image..."
     pk8=`ls $bin/avb/*.pk8`;
     cert=`ls $bin/avb/*.x509.*`;
@@ -525,8 +527,5 @@ patch_prop() {
     sed -i "${line}s;.*;${2}=${3};" $1;
   fi;
 }
-
-# grep_prop <prop name>
-grep_prop() { grep "^$1" "/system/build.prop" | cut -d= -f2; }
 
 ## end methods

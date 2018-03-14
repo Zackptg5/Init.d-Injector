@@ -1,7 +1,7 @@
-# start init.d patch - ZIndicator
+# Run init.d scripts
 service sysinit /system/bin/logwrapper /system/bin/sysinit
-    class late_start
+    class post-fs-data
     seclabel u:r:sysinit:s0
     user root
-    group root
+    group shell
     oneshot

@@ -7,11 +7,13 @@ INSTALLER=<INSTALLER>
 OUTFD=<OUTFD>
 BOOTMODE=<BOOTMODE>
 SLOT=<SLOT>
+MAGISK=false
 
 ui_print() {
   $BOOTMODE && echo "$1" || echo -e "ui_print $1\nui_print" >> /proc/self/fd/$OUTFD
 }
 
+. $INSTALLER/config.sh
 . $INSTALLER/common/unityfiles/util_functions.sh
 
 # shell variables
@@ -57,18 +59,17 @@ dump_boot
 # File list
 list="init*.rc sepolicy"
 
-## AnyKernel Slot device support
-slot_device
-
 # determine install or uninstall
-test "$(grep "ZIndicator" $overlay/init.rc)" && ACTION=Uninstall
+[ "$(grep "import /init.initd.rc" $overlay/init.rc)" ] && ACTION=Uninstall
 
 # begin ramdisk changes
 if [ -z $ACTION ]; then
+  ui_print "- Installing"
   ui_print "   Adding init.d support to kernel..."
   # remove old broken init.d support
   ui_print "   Removing existing sysinit init.d logic..."
-  for FILE in $overlay/init*.rc; do
+  for FILE in $overlay/init*.rc /system/etc/init/*.rc /vendor/etc/init/*.rc /vendor/etc/init/hw/*.rc /odm/etc/init/*.rc; do
+    [ "$(basename $FILE)" == "init.initd.rc" ] && continue
     if [ "$(grep -E "init.d|sysinit" $FILE)" ]; then
 	    backup_file $FILE
       remove_section_mod $FILE "# Run sysinit"
@@ -85,10 +86,11 @@ if [ -z $ACTION ]; then
   # add proper init.d patch
   backup_file $overlay/init.rc
   ui_print "   Patching init files..."
-  append_file $overlay/init.rc "# init.d" init
+  sed -i '1 i\import /init.initd.rc' $overlay/init.rc
   
   # replace old broken init.d
   ui_print "   Replacing sysinit..."
+  backup_and_remove /system/etc/init.d/0000INITD
   backup_and_remove /system/bin/sysinit
   backup_and_remove /system/xbin/sysinit
   backup_and_remove /system/bin/sepolicy-inject
@@ -97,8 +99,10 @@ if [ -z $ACTION ]; then
   backup_and_remove /system/xbin/seinfo
   backup_and_remove /system/bin/sesearch
   backup_and_remove /system/xbin/sesearch
-  cp -f $patch/sysinit /system/bin/sysinit
+  cp -af $INSTALLER/common/ak2/patch/sysinit /system/bin/sysinit
   chmod 0755 /system/bin/sysinit
+  mkdir -p /system/etc/init.d
+  cp -af $INSTALLER/common/ak2/patch/0000INITD /system/etc/init.d/0000INITD
 
   # copy setools
   ui_print "   Installing setools to /sbin..."
@@ -110,23 +114,26 @@ if [ -z $ACTION ]; then
   
   backup_file sepolicy
   $SETOOLS/sepolicy-inject -Z sysinit -P $overlay/sepolicy
-  $SETOOLS/sepolicy-inject -s init -t sysinit -c process -p transition -P $overlay/sepolicy
-  $SETOOLS/sepolicy-inject -s init -t sysinit -c process -p rlimitinh -P $overlay/sepolicy
-  $SETOOLS/sepolicy-inject -s init -t sysinit -c process -p siginh -P $overlay/sepolicy
-  $SETOOLS/sepolicy-inject -s init -t sysinit -c process -p noatsecure -P $overlay/sepolicy
-
+  $SETOOLS/sepolicy-inject -s init -t app_data_file -c dir -p search,read -P $overlay/sepolicy
+  # $SETOOLS/sepolicy-inject -s init -t sysinit -c process -p transition -P $overlay/sepolicy
+  # $SETOOLS/sepolicy-inject -s init -t sysinit -c process -p rlimitinh -P $overlay/sepolicy
+  # $SETOOLS/sepolicy-inject -s init -t sysinit -c process -p siginh -P $overlay/sepolicy
+  # $SETOOLS/sepolicy-inject -s init -t sysinit -c process -p noatsecure -P $overlay/sepolicy
+  
+  ui_print "   Setting permissions..."
+  set_permissions
 else
+  ui_print "- Uninstalling"
   ui_print "   Removing init.d support to kernel..."
   ui_print "   Removing init.d patches and sepolicy-inject..."
-  rm -f sbin/sepolicy-inject sbin/sesearch sbin/seinfo
+  rm -f $overlay/init.initd.rc /system/etc/init.d/0000INITD sbin/sepolicy-inject sbin/sesearch sbin/seinfo
   ui_print "   Restoring original files..."
-  for FILE in $overlay/init*.rc $overlay/sepolicy /system/bin/sysinit /system/xbin/sysinit /system/bin/sepolicy-inject /system/xbin/sepolicy-inject /system/bin/seinfo /system/xbin/seinfo /system/bin/sesearch /system/xbin/sesearch $(find /system -name install-recovery.sh); do
+  for FILE in $overlay/init*.rc /system/etc/init/*.rc /vendor/etc/init/*.rc /vendor/etc/init/hw/*.rc /odm/etc/init/*.rc $overlay/sepolicy /system/bin/sysinit /system/xbin/sysinit /system/bin/sepolicy-inject /system/xbin/sepolicy-inject /system/bin/seinfo /system/xbin/seinfo /system/bin/sesearch /system/xbin/sesearch $(find /system -name install-recovery.sh); do
     restore_file $FILE
   done
 fi
 
 #end ramdisk changes
-ui_print " "
 ui_print "   Repacking boot image..."
 write_boot
 

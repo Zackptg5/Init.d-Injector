@@ -33,7 +33,7 @@ PROPFILE=false
 POSTFSDATA=true
 
 # Set to true if you need late_start service script
-LATESTARTSERVICE=true
+LATESTARTSERVICE=false
 
 # Unity Variables
 # Uncomment and change 'MINAPI' and 'MAXAPI' to the minimum and maxium android version for your mod (note that magisk has it's own minimum api: 21 (lollipop))
@@ -44,7 +44,42 @@ LATESTARTSERVICE=true
 
 # Custom Variables - Keep everything within this function
 unity_custom() {
-  :
+  # Patch boot img if not using root solution that supports boot scripts
+  if [ "$MODPATH" == "/system/etc/init.d" ]; then
+    ui_print "   Using Anykernel2 by osm0sis @ xda-developers"
+    rm -f $INFO
+    sed -i -e "s|<INSTALLER>|$INSTALLER|" -e "s|<OUTFD>|$OUTFD|" -e "s|<BOOTMODE>|$BOOTMODE|" $INSTALLER/common/ak2/anykernel.sh
+    if [ -z $SLOT ]; then 
+      sed -i "/<SLOT>/d" $INSTALLER/common/ak2/anykernel.sh
+    else
+      sed -i "s|<SLOT>|$SLOT|" $INSTALLER/common/ak2/anykernel.sh
+    fi
+    mkdir -p $INSTALLER/common/ak2/bin
+    cd $INSTALLER/common/ak2
+    case $ABILONG in
+      arm64*) BBABI=arm64;;
+      arm*) BBABI=arm;;
+      x86_64*) BBABI=x86_64;;
+      x86*) BBABI=x86;;
+      mips64*) BBABI=mips64;;
+      mips*) BBABI=mips;;
+      *) $MAGISK && rm -rf $MODPATH; abort "Unknown architecture: $ABILONG";;
+    esac
+    BB=$INSTALLER/common/ak2/tools/busybox-$BBABI
+    chmod 755 $BB
+    $BB chmod -R 755 $INSTALLER/common/ak2/tools $INSTALLER/common/ak2/bin
+    for i in $($BB --list); do
+      $BB ln -s $BB $INSTALLER/common/ak2/bin/$i
+    done
+    if [ $? != 0 -o -z "$(ls $INSTALLER/common/ak2/bin)" ]; then
+      abort "   ! Recovery busybox setup failed!"
+    fi
+    PATH="$INSTALLER/common/ak2/bin:$PATH" $BB ash $INSTALLER/common/ak2/anykernel.sh $2
+    if [ $? != "0" ]; then
+      abort "   ! Install failed!"
+    fi
+    cleanup
+  fi
 }
 
 ##########################################################################################
@@ -97,8 +132,8 @@ set_permissions() {
   $MAGISK && set_perm_recursive $MODPATH 0 0 0755 0644
  
   # CUSTOM PERMISSIONS
-  $MAGISK || set_perm $UNITY$SYS/bin/sysinit 0 2000 0755
-  set_perm_recursive $UNITY$SYS/etc/init.d 0 0 0755 0755
+  $MAGISK || set_perm $UNITY/system/bin/sysinit 0 2000 0755
+  set_perm_recursive $UNITY/system/etc/init.d 0 0 0755 0755
   
   # Some templates if you have no idea what to do:
   # Note that all files/folders have the $UNITY prefix - keep this prefix on all of your files/folders
