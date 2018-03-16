@@ -20,9 +20,9 @@ export PATH=/sbin:/system/sbin:/system/bin:/system/xbin
 # A 5 seconds should be the safe value and more than enough - if something is going to execute init.d, it should start within 5 seconds from boot
 # You can also specify "0" here for no delay and insta-call, but beware that all your init.d scripts probably will be executed twice - by kernel and this hook
 DELAY=5
-INITDPART="/system/etc/init.d/0000INITD" # This is the init.d part of Init.d
-CHECKPART="/data/INITD" # This is the check-file, must be the same here and in the init.d part specified above
-LOG="/data/Initd.log" # Log for init.d
+INITDPART="/system/etc/init.d/0000InitdinjectorTest" # This is the init.d part of Init.d
+CHECKPART="/data/InitdinjectorTest" # This is the check-file, must be the same here and in the init.d part specified above
+LOG="/data/0000InitdinjectorTest.log" # Log for init.d
 
 # Forward stdout and stderr to our log
 exec 1>"$LOG"

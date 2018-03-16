@@ -132,8 +132,7 @@ set_permissions() {
   $MAGISK && set_perm_recursive $MODPATH 0 0 0755 0644
  
   # CUSTOM PERMISSIONS
-  $MAGISK || set_perm $UNITY/system/bin/sysinit 0 2000 0755
-  set_perm_recursive $UNITY/system/etc/init.d 0 0 0755 0755
+  set_perm $UNITY/system/etc/init.d/0000InitdinjectorTest 0 0 0755
   
   # Some templates if you have no idea what to do:
   # Note that all files/folders have the $UNITY prefix - keep this prefix on all of your files/folders

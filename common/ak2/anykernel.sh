@@ -17,7 +17,7 @@ ui_print() {
 . $INSTALLER/common/unityfiles/util_functions.sh
 
 # shell variables
-ramdisk_compression=auto                        
+ramdisk_compression=auto
 # determine the location of the boot partition
 if [ "$(find /dev/block -name boot | head -n 1)" ]; then
   block=$(find /dev/block -name boot | head -n 1)
@@ -57,68 +57,65 @@ ui_print " "
 dump_boot
 
 # File list
-list="init*.rc sepolicy"
+for FILE in $(find $overlay /system /vendor -type f -name '*.rc'); do
+  [ "$(grep 'service sysinit' $FILE)" ] && { INITFILE=$FILE; break; }
+done
+
+if [ "$INITFILE" ] && [ "$(dirname $INITFILE)" == "$INSTALLER/common/ak2/ramdisk" ]; then
+  list="init.rc $INITFILE"
+else
+  list="init.rc"
+fi
 
 # determine install or uninstall
-[ "$(grep "import /init.initd.rc" $overlay/init.rc)" ] && ACTION=Uninstall
+if [ "$INITFILE" ]; then
+  [ "$(grep '#initdinjector' $INITFILE)" ] && ACTION=Uninstall
+else
+  [ "$(grep '#initdinjector' $overlay/init.rc)" ] && ACTION=Uninstall
+fi
 
 # begin ramdisk changes
 if [ -z $ACTION ]; then
   ui_print "- Installing"
   ui_print "   Adding init.d support to kernel..."
-  # remove old broken init.d support
-  ui_print "   Removing existing sysinit init.d logic..."
-  for FILE in $overlay/init*.rc /system/etc/init/*.rc /vendor/etc/init/*.rc /vendor/etc/init/hw/*.rc /odm/etc/init/*.rc; do
-    [ "$(basename $FILE)" == "init.initd.rc" ] && continue
-    if [ "$(grep -E "init.d|sysinit" $FILE)" ]; then
-	    backup_file $FILE
-      remove_section_mod $FILE "# Run sysinit"
-      remove_line $FILE "start sysinit"
-      remove_section_mod $FILE "# sysinit"
-      remove_section_mod $FILE "service sysinit"
-      remove_section_mod $FILE "# init.d"
-      remove_section_mod $FILE "service userinit"
-	  fi
-  done
-  
-  [ "$(find /system -name install-recovery.sh)" ] && { ui_print "   Removing init.d logic from install-recovery.sh..."; backup_file $(find /system -name install-recovery.sh); sed -i '/init.d/d' $(find /system -name install-recovery.sh); }
   
   # add proper init.d patch
-  backup_file $overlay/init.rc
-  ui_print "   Patching init files..."
-  sed -i '1 i\import /init.initd.rc' $overlay/init.rc
+  if [ "$INITFILE" ]; then
+    if [ ! "$(sed -n "/service sysinit/,/^$/{/seclabel/p}" $INITFILE)" ]; then
+      ui_print "   Sysinit detected!"
+      ui_print "   Patching $INITFILE..."
+      sed -i "/service sysinit/a\    seclabel u:r:sudaemon:s0 #initdinjector" $INITFILE
+    else
+      ui_print "   Sysinit detected! Init.d support natively present!"
+      abort "   Aborting!"
+    fi
+  else
+    ui_print "   Sysinit not detected!"
+    ui_print "   Patching init.rc..."
+    cp -f $INSTALLER/common/ak2/patch/init.initd.rc $overlay/init.initd.rc
+    sed -i '1 i\import /init.initd.rc #initdinjector' $overlay/init.rc
+    ui_print "   Installing sysinit..."
+    cp -f $INSTALLER/common/ak2/patch/sysinit /system/bin/sysinit
+    chown 0:2000 /system/bin/sysinit
+    chmod 0755 /system/bin/sysinit
+    chcon 'u:object_r:system_file:s0' /system/bin/sysinit
+  fi
   
-  # replace old broken init.d
-  ui_print "   Replacing sysinit..."
-  backup_and_remove /system/etc/init.d/0000INITD
-  backup_and_remove /system/bin/sysinit
-  backup_and_remove /system/xbin/sysinit
+  # add test init.d script
+  ui_print "   Installing test init.d script..."
+  mkdir -p /system/etc/init.d
+  cp -f $INSTALLER/common/ak2/patch/0000InitdinjectorTest /system/etc/init.d/0000InitdinjectorTest
+  
+  # copy setools
+  ui_print "   Adding setools to /sbin..."
   backup_and_remove /system/bin/sepolicy-inject
   backup_and_remove /system/xbin/sepolicy-inject
   backup_and_remove /system/bin/seinfo
   backup_and_remove /system/xbin/seinfo
   backup_and_remove /system/bin/sesearch
   backup_and_remove /system/xbin/sesearch
-  cp -af $INSTALLER/common/ak2/patch/sysinit /system/bin/sysinit
-  chmod 0755 /system/bin/sysinit
-  mkdir -p /system/etc/init.d
-  cp -af $INSTALLER/common/ak2/patch/0000INITD /system/etc/init.d/0000INITD
-
-  # copy setools
-  ui_print "   Installing setools to /sbin..."
-  cp -f $SETOOLS/* sbin
-  chmod 0755 sbin/*
-
-  # sepolicy patches by CosmicDan @xda-developers
-  ui_print "   Injecting sepolicy with init.d permissions..."
-  
-  backup_file sepolicy
-  $SETOOLS/sepolicy-inject -Z sysinit -P $overlay/sepolicy
-  $SETOOLS/sepolicy-inject -s init -t app_data_file -c dir -p search,read -P $overlay/sepolicy
-  # $SETOOLS/sepolicy-inject -s init -t sysinit -c process -p transition -P $overlay/sepolicy
-  # $SETOOLS/sepolicy-inject -s init -t sysinit -c process -p rlimitinh -P $overlay/sepolicy
-  # $SETOOLS/sepolicy-inject -s init -t sysinit -c process -p siginh -P $overlay/sepolicy
-  # $SETOOLS/sepolicy-inject -s init -t sysinit -c process -p noatsecure -P $overlay/sepolicy
+  cp -f $SETOOLS/* $overlay/sbin
+  chmod 0755 $overlay/sbin/*
   
   ui_print "   Setting permissions..."
   set_permissions
@@ -126,9 +123,14 @@ else
   ui_print "- Uninstalling"
   ui_print "   Removing init.d support to kernel..."
   ui_print "   Removing init.d patches and sepolicy-inject..."
-  rm -f $overlay/init.initd.rc /system/etc/init.d/0000INITD sbin/sepolicy-inject sbin/sesearch sbin/seinfo
+  rm -f $overlay/init.initd.rc /system/etc/init.d/InitdinjectorTest $overlay/sbin/sepolicy-inject $overlay/sbin/sesearch $overlay/sbin/seinfo
   ui_print "   Restoring original files..."
-  for FILE in $overlay/init*.rc /system/etc/init/*.rc /vendor/etc/init/*.rc /vendor/etc/init/hw/*.rc /odm/etc/init/*.rc $overlay/sepolicy /system/bin/sysinit /system/xbin/sysinit /system/bin/sepolicy-inject /system/xbin/sepolicy-inject /system/bin/seinfo /system/xbin/seinfo /system/bin/sesearch /system/xbin/sesearch $(find /system -name install-recovery.sh); do
+  if [ "$INITFILE" ]; then
+    sed -i "/seclabel u:r:sudaemon:s0 #initdinjector/d" $INITFILE
+  else
+    sed -i "/import \/init.initd.rc #initdinjector/d" $overlay/init.rc
+  fi
+  for FILE in /system/bin/sepolicy-inject /system/xbin/sepolicy-inject /system/bin/seinfo /system/xbin/seinfo /system/bin/sesearch /system/xbin/sesearch; do
     restore_file $FILE
   done
 fi

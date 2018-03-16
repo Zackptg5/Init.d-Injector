@@ -26,6 +26,6 @@
 # Don't change values below unless you know what you're doing
 
 # Core
-touch "/data/INITD"
+touch "/data/InitdinjectorTest"
 exit 0
 
