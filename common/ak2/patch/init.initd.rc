@@ -1,6 +1,6 @@
 # Run init.d scripts
 service sysinit /system/bin/logwrapper /system/bin/sysinit
     class post-fs-data
-    seclabel u:r:sudaemon:s0
+    seclabel u:r:<DOMAIN>:s0
     user root
     oneshot

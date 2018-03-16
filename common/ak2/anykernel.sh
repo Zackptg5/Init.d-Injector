@@ -62,9 +62,9 @@ for FILE in $(find $overlay /system /vendor -type f -name '*.rc'); do
 done
 
 if [ "$INITFILE" ] && [ "$(dirname $INITFILE)" == "$INSTALLER/common/ak2/ramdisk" ]; then
-  list="init.rc $INITFILE"
+  list="init.rc sepolicy $INITFILE"
 else
-  list="init.rc"
+  list="init.rc sepolicy"
 fi
 
 # determine install or uninstall
@@ -74,17 +74,32 @@ else
   [ "$(grep '#initdinjector' $overlay/init.rc)" ] && ACTION=Uninstall
 fi
 
+# use sudaemon if present, permissive shell otherwise
+if [ "$($SETOOLS/sesearch --allow -s sudaemon $overlay/sepolicy)" ]; then
+  DOMAIN=sudaemon
+else
+  DOMAIN=shell
+fi
+
 # begin ramdisk changes
 if [ -z $ACTION ]; then
   ui_print "- Installing"
   ui_print "   Adding init.d support to kernel..."
+  
+  if [ "$DOMAIN" == "sudaemon" ]; then
+    ui_print "   Sudaemon found! No need for sepolicy patching"
+  else
+    ui_print "   Sudaemon not found! Patching sepolicy..."
+    backup_file $overlay/sepolicy
+    $SETOOLS/sepolicy-inject -Z shell -P $overlay/sepolicy
+  fi
   
   # add proper init.d patch
   if [ "$INITFILE" ]; then
     if [ ! "$(sed -n "/service sysinit/,/^$/{/seclabel/p}" $INITFILE)" ]; then
       ui_print "   Sysinit detected!"
       ui_print "   Patching $INITFILE..."
-      sed -i "/service sysinit/a\    seclabel u:r:sudaemon:s0 #initdinjector" $INITFILE
+      sed -i "/service sysinit/a\    seclabel u:r:$DOMAIN:s0 #initdinjector" $INITFILE
     else
       ui_print "   Sysinit detected! Init.d support natively present!"
       abort "   Aborting!"
@@ -92,8 +107,9 @@ if [ -z $ACTION ]; then
   else
     ui_print "   Sysinit not detected!"
     ui_print "   Patching init.rc..."
+    sed -i "s/<DOMAIN>/$DOMAIN/" $INSTALLER/common/ak2/patch/init.initd.rc
     cp -f $INSTALLER/common/ak2/patch/init.initd.rc $overlay/init.initd.rc
-    backup_file $overlay/init.initd.rc
+    backup_file $overlay/init.rc
     sed -i '1 i\import /init.initd.rc #initdinjector' $overlay/init.rc
     ui_print "   Installing sysinit..."
     cp -f $INSTALLER/common/ak2/patch/sysinit /system/bin/sysinit
@@ -127,10 +143,11 @@ else
   rm -f $overlay/init.initd.rc /system/etc/init.d/InitdinjectorTest $overlay/sbin/sepolicy-inject $overlay/sbin/sesearch $overlay/sbin/seinfo
   ui_print "   Restoring original files..."
   if [ "$INITFILE" ]; then
-    sed -i "/seclabel u:r:sudaemon:s0 #initdinjector/d" $INITFILE
+    sed -i "/seclabel u:r:.*:s0 #initdinjector/d" $INITFILE
   else
     sed -i "/import \/init.initd.rc #initdinjector/d" $overlay/init.rc
   fi
+  [ "$DOMAIN" == "shell" ] && restore_file $overlay/sepolicy
   for FILE in /system/bin/sepolicy-inject /system/xbin/sepolicy-inject /system/bin/seinfo /system/xbin/seinfo /system/bin/sesearch /system/xbin/sesearch; do
     restore_file $FILE
   done
