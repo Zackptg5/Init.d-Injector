@@ -21,7 +21,7 @@ reset_ak() {
 
 # Slot device support
 slot_device() {
-  if [ ! -z $slot ]; then           
+  if [ ! -z $SLOT ]; then           
     if [ -d $ramdisk/.subackup -o -d $ramdisk/.backup ]; then
       patch_cmdline "skip_override" "skip_override"
     else
@@ -50,9 +50,9 @@ signedboot_check() {
     # if we don't have dalvikvm, we want the same behavior as boot.art/oat not found
     RET="initialize runtime"
   else
-    RET=$($BOOTSIGNATURE -verify /tmp/anykernel/boot.img 2>&1)
+    RET=$($BOOTSIGNATURE -verify $INSTALLER/common/ak2/boot.img 2>&1)
   fi
-  test ! -z $slot && RET=$($BOOTSIGNATURE -verify /tmp/anykernel/boot.img 2>&1)
+  test ! -z $SLOT && RET=$($BOOTSIGNATURE -verify $INSTALLER/common/ak2/boot.img 2>&1)
   if (`echo $RET | grep "VALID" >/dev/null 2>&1`); then
     ui_print "Signed boot img detected!"
     SIGNED=true

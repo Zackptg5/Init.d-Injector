@@ -93,6 +93,7 @@ if [ -z $ACTION ]; then
     ui_print "   Sysinit not detected!"
     ui_print "   Patching init.rc..."
     cp -f $INSTALLER/common/ak2/patch/init.initd.rc $overlay/init.initd.rc
+    backup_file $overlay/init.initd.rc
     sed -i '1 i\import /init.initd.rc #initdinjector' $overlay/init.rc
     ui_print "   Installing sysinit..."
     cp -f $INSTALLER/common/ak2/patch/sysinit /system/bin/sysinit
