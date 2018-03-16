@@ -83,9 +83,7 @@ fi
 
 # begin ramdisk changes
 if [ -z $ACTION ]; then
-  ui_print "- Installing"
-  ui_print "   Adding init.d support to kernel..."
-  
+  ui_print "- Installing"  
   if [ "$DOMAIN" == "sudaemon" ]; then
     ui_print "   Sudaemon found! No need for sepolicy patching"
   else
@@ -97,8 +95,8 @@ if [ -z $ACTION ]; then
   # add proper init.d patch
   if [ "$INITFILE" ]; then
     if [ ! "$(sed -n "/service sysinit/,/^$/{/seclabel/p}" $INITFILE)" ]; then
-      ui_print "   Sysinit detected!"
-      ui_print "   Patching $INITFILE..."
+      ui_print "   Sysinit detected in $(echo $INITFILE | sed "s|$ramdisk||")!"
+      ui_print "   Adding seclabel to sysinit..."
       sed -i "/service sysinit/a\    seclabel u:r:$DOMAIN:s0 #initdinjector" $INITFILE
     else
       ui_print "   Sysinit detected! Init.d support natively present!"
@@ -138,7 +136,6 @@ if [ -z $ACTION ]; then
   set_permissions
 else
   ui_print "- Uninstalling"
-  ui_print "   Removing init.d support to kernel..."
   ui_print "   Removing init.d patches and sepolicy-inject..."
   rm -f $overlay/init.initd.rc /system/etc/init.d/InitdinjectorTest $overlay/sbin/sepolicy-inject $overlay/sbin/sesearch $overlay/sbin/seinfo
   ui_print "   Restoring original files..."
