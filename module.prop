@@ -3,6 +3,6 @@ name=Init.d Injector
 version=v1.0
 versionCode=1
 author=Zackptg5
-description=Adds init.d support
+description=Adds init.d support (executes all as post-fs-data scripts - same as they would natively be run)
 support=https://forum.xda-developers.com/android/software-hacking/mod-universal-init-d-injector-wip-t3692105
 minMagisk=1530
