@@ -6,6 +6,9 @@ Built with Unity installer by Zackptg5 (https://github.com/Zackptg5/Unity) and A
 [More details in support thread](https://forum.xda-developers.com/android/software-hacking/mod-universal-init-d-injector-wip-t3692105).
 
 ## Change Log
+### v1.2 - 4.xx.2018
+* Unity v1.5.2 update
+
 ### v1.1 - 3.17.2018
 * Run all scripts except live boot as late start in magisk due to magisk mount occuring after post-fs-data script
 
