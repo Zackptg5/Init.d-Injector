@@ -1,13 +1,14 @@
 # Init.d Injector
 Injects init.d support:
-Into rom if using magisk or supersu without modifying boot img.
-Into boot.img if rootless or using other root solution (since they don't support boot scripts) using modified Archidroid method by JustArchi @xda-developers and setools by Xmikos (https://github.com/xmikos/setools-android)
+Via post-fs-data script if using magisk
+Via init script if system install (also installs setools by Xmikos (https://github.com/xmikos/setools-android))
 Built with Unity installer by Zackptg5 (https://github.com/Zackptg5/Unity) and AnyKernel2 by Osm0sis (https://github.com/osm0sis/AnyKernel2/)
 [More details in support thread](https://forum.xda-developers.com/android/software-hacking/mod-universal-init-d-injector-wip-t3692105).
 
 ## Change Log
 ### v1.3 - 5.xx.2018
 * Redid ak2 logic - redo scripting (uses initd.sh rather than sysinit), has capability to run init.d scripts as post-fs-data (default) and late_start (add '-ls' to the end of the name of it), use this logic for all system installs
+* Magisk has same logic as above
 * Update it so it'll work with sysover if user chooses
 
 ### v1.2.1 - 4.26.2018
