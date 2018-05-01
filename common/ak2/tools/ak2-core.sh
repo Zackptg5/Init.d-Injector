@@ -6,19 +6,65 @@ split_img=$INSTALLER/common/ak2/split_img;
 patch=$INSTALLER/common/ak2/patch;
 
 chmod -R 755 $bin;
-mkdir -p $ramdisk $split_img;
+mkdir -p $split_img;
 
 FD=$1;
-     
+
 # contains <string> <substring>
 contains() { test "${1#*$2}" != "$1" && return 0 || return 1; }
 
+# file_getprop <file> <property>
+file_getprop() { grep "^$2=" "$1" | cut -d= -f2; }
+
 # reset anykernel directory
 reset_ak() {
-  rm -rf $ramdisk $split_img $INSTALLER/common/ak2/rdtmp $INSTALLER/common/ak2/boot.img $INSTALLER/common/ak2/*-new.*;
+  rm -rf $(dirname $INSTALLER/common/ak2/*-files/current)/ramdisk;
+  for i in $ramdisk $split_img $INSTALLER/common/ak2/rdtmp $INSTALLER/common/ak2/boot.img $INSTALLER/common/ak2/*-new*; do
+    cp -af $i $(dirname $INSTALLER/common/ak2/*-files/current);
+  done;
+  rm -rf $ramdisk $split_img $patch $INSTALLER/common/ak2/rdtmp $INSTALLER/common/ak2/boot.img $INSTALLER/common/ak2/*-new* $INSTALLER/common/ak2/*-files/current;
   . $INSTALLER/common/ak2/tools/ak2-core.sh $FD;
 }
 
+# find the location of the boot block
+find_boot() {
+	# if we already have boot block set then verify and use it
+	[ "$block" == "auto" ] || return
+	# otherwise, time to go hunting!
+	if [ -f /etc/recovery.fstab ]; then
+		# recovery fstab v1
+		block=$(awk '$1 == "/boot" {print $3}' /etc/recovery.fstab)
+		[ "$block" ]  && return
+		# recovery fstab v2
+		block=$(awk '$2 == "/boot" {print $1}' /etc/recovery.fstab)
+		[ "$block" ]  && return
+	fi
+	for fstab in /fstab.*; do
+		[ -f "$fstab" ] || continue
+		# device fstab v2
+		block=$(awk '$2 == "/boot" {print $1}' "$fstab")
+		[ "$block" ]  && return
+		# device fstab v1
+		block=$(awk '$1 == "/boot" {print $3}' "$fstab")
+		[ "$block" ]  && return
+	done
+	if [ -f /proc/emmc ]; then
+		# emmc layout
+		block=$(awk '$4 == "\"boot\"" {print $1}' /proc/emmc)
+		[ "$block" ] && block=/dev/block/$(echo "$block" | cut -f1 -d:)  && return
+	fi
+	if [ -f /proc/mtd ]; then
+		# mtd layout
+		block=$(awk '$4 == "\"boot\"" {print $1}' /proc/mtd)
+		[ "$block" ] && block=/dev/block/$(echo "$block" | cut -f1 -d:)  && return
+	fi
+	if [ -f /proc/dumchar_info ]; then
+		# mtk layout
+		block=$(awk '$1 == "/boot" {print $5}' /proc/dumchar_info)
+		[ "$block" ]  && return
+	fi
+	abort "Unable to find boot block location!"
+}
 # Slot device support
 slot_device() {
   if [ ! -z $SLOT ]; then           
@@ -61,17 +107,22 @@ signedboot_check() {
 # dump boot and extract ramdisk
 split_boot() {
   if [ ! -e "$(echo $block | cut -d\  -f1)" ]; then
-    ui_print " "; abort "   ! Invalid partition!";
+    ui_print " "; abort "   ! Invalid partition. Aborting...";
   fi;
   if [ -f "$bin/nanddump" ]; then
     $bin/nanddump -f $INSTALLER/common/ak2/boot.img $block;
   else
     dd if=$block of=$INSTALLER/common/ak2/boot.img;
   fi;
-  if [ "$(strings $INSTALLER/common/ak2/boot.img | grep -E 'Green Loader|Green Recovery')" ]; then
+  nooktest=$(strings $INSTALLER/common/ak2/boot.img | grep -E 'Red Loader|Green Loader|Green Recovery|eMMC boot.img|eMMC recovery.img|BauwksBoot');
+  if [ "$nooktest" ]; then
+    case $nooktest in
+      *BauwksBoot*) nookoff=262144;;
+      *) nookoff=1048576;;
+    esac;
     mv -f $INSTALLER/common/ak2/boot.img $INSTALLER/common/ak2/boot-orig.img;
-    dd bs=1048576 count=1 conv=notrunc if=$INSTALLER/common/ak2/boot-orig.img of=$split_img/boot.img-master_boot.key;
-    dd bs=1048576 skip=1 conv=notrunc if=$INSTALLER/common/ak2/boot-orig.img of=$INSTALLER/common/ak2/boot.img;
+    dd bs=$nookoff count=1 conv=notrunc if=$INSTALLER/common/ak2/boot-orig.img of=$split_img/boot.img-master_boot.key;
+    dd bs=$nookoff skip=1 conv=notrunc if=$INSTALLER/common/ak2/boot-orig.img of=$INSTALLER/common/ak2/boot.img;
   fi;
   if [ -f "$bin/unpackelf" -a "$($bin/unpackelf -i $INSTALLER/common/ak2/boot.img -h -q 2>/dev/null; echo $?)" == 0 ]; then
     if [ -f "$bin/elftool" ]; then
@@ -96,7 +147,7 @@ split_boot() {
     if [ "$(cat $split_img/boot.img-type)" == "Multi" ]; then
       $bin/dumpimage -i $INSTALLER/common/ak2/boot.img -p 1 $split_img/boot.img-ramdisk.gz;
     fi;
-    test $? != 0 && dumpfail=1;                           
+    test $? != 0 && dumpfail=1;
   elif [ -f "$bin/rkcrc" ]; then
     dd bs=4096 skip=8 iflag=skip_bytes conv=notrunc if=$INSTALLER/common/ak2/boot.img of=$split_img/boot.img-ramdisk.gz;
   elif [ -f "$bin/pxa-unpackbootimg" ]; then
@@ -124,7 +175,7 @@ unpack_ramdisk() {
   fi;
   rm -f $ramdisk/placeholder
   mv -f $ramdisk $INSTALLER/common/ak2/rdtmp;
-   case $(od -ta -An -N4 $split_img/boot.img-ramdisk.gz) in
+  case $(od -ta -An -N4 $split_img/boot.img-ramdisk.gz) in
     '  us  vt'*|'  us  rs'*) compext="gz"; unpackcmd="gzip";;
     '  ht   L   Z   O') compext="lzo"; unpackcmd="lzop";;
     '   ] nul nul nul') compext="lzma"; unpackcmd="$bin/xz";;
@@ -132,19 +183,20 @@ unpack_ramdisk() {
     '   B   Z   h'*) compext="bz2"; unpackcmd="bzip2";;
     ' stx   !   L can') compext="lz4-l"; unpackcmd="$bin/lz4";;
     ' etx   !   L can'|' eot   "   M can') compext="lz4"; unpackcmd="$bin/lz4";;
-    *) ui_print " "; abort "   ! Unknown ramdisk compression!";
+    *) ui_print " "; abort "   ! Unknown ramdisk compression!";;
   esac;
   mv -f $split_img/boot.img-ramdisk.gz $split_img/boot.img-ramdisk.cpio.$compext;
-  mkdir -p $ramdisk;                 
+  mkdir -p $ramdisk;
   chmod 755 $ramdisk;
   cd $ramdisk;
   $unpackcmd -dc $split_img/boot.img-ramdisk.cpio.$compext | EXTRACT_UNSAFE_SYMLINKS=1 cpio -i -d;
   if [ $? != 0 -o -z "$(ls $ramdisk)" ]; then
-    ui_print " "; abort "   ! Unpacking ramdisk failed!";
+    ui_print " "; abort "!   Unpacking ramdisk failed!";
   fi;
   test ! -z "$(ls $INSTALLER/common/ak2/rdtmp)" && cp -af $INSTALLER/common/ak2/rdtmp/* $ramdisk;
 }
 dump_boot() {
+  find_boot;
   slot_device;
   signedboot_check;
   split_boot;
@@ -181,7 +233,7 @@ repack_ramdisk() {
     mv -f ramdisk-new.cpio.$compext-mtk ramdisk-new.cpio.$compext;
   fi;
 }
-flash_boot() {             
+flash_boot() {
   cd $split_img;
   if [ -f "$bin/mkimage" ]; then
     name=`cat *-name`;
@@ -195,6 +247,7 @@ flash_boot() {
   else
     if [ -f *-cmdline ]; then
       cmdline=`cat *-cmdline`;
+      cmd="$split_img/boot.img-cmdline@cmdline";
     fi;
     if [ -f *-board ]; then
       board=`cat *-board`;
@@ -246,13 +299,13 @@ flash_boot() {
   for i in dtb dt.img; do
     if [ -f $INSTALLER/common/ak2/$i ]; then
       dtb="--dt $INSTALLER/common/ak2/$i";
-      rpm="$INSTALLER/common/ak2/$i,rpm";                            
+      rpm="$INSTALLER/common/ak2/$i,rpm";
       break;
     fi;
   done;
   if [ ! "$dtb" -a -f *-dtb ]; then
     dtb=`ls *-dtb`;
-    rpm="$split_img/$dtb,rpm";                          
+    rpm="$split_img/$dtb,rpm";
     dtb="--dt $split_img/$dtb";
   fi;
   cd $INSTALLER/common/ak2;
@@ -263,10 +316,10 @@ flash_boot() {
     esac;
   fi;
   if [ -f "$bin/mkimage" ]; then
-    test "$type" == "Multi" && uramdisk=":$rd";                                          
+    test "$type" == "Multi" && uramdisk=":$rd";
     $bin/mkimage -A $arch -O $os -T $type -C $comp -a $addr -e $ep -n "$name" -d $kernel$uramdisk boot-new.img;
-   elif [ -f "$bin/elftool" ]; then
-    $bin/elftool pack -o boot-new.img header=$split_img/boot.img-header $kernel $rd,ramdisk $rpm $split_img/boot.img-cmdline@cmdline;                                                                                                 
+  elif [ -f "$bin/elftool" ]; then
+    $bin/elftool pack -o boot-new.img header=$split_img/boot.img-header $kernel $rd,ramdisk $rpm $cmd;
   elif [ -f "$bin/rkcrc" ]; then
     $bin/rkcrc -k $rd boot-new.img;
   elif [ -f "$bin/pxa-mkbootimg" ]; then
@@ -276,8 +329,6 @@ flash_boot() {
   fi;
   if [ $? != 0 ]; then
     ui_print " "; abort "   ! Repacking image failed!";
-  elif [ "$(wc -c < boot-new.img)" -gt "$(wc -c < boot.img)" ]; then
-    ui_print " "; abort "   ! New image larger than boot partition!";
   fi;
   if [ -f "$bin/futility" -a -d "$bin/chromeos" ]; then
     $bin/futility vbutil_kernel --pack boot-new-signed.img --keyblock $bin/chromeos/kernel.keyblock --signprivate $bin/chromeos/kernel_data_key.vbprivk --version 1 --vmlinuz boot-new.img --bootloader $bin/chromeos/empty --config $bin/chromeos/empty --arch arm --flags 0x1;
@@ -334,7 +385,9 @@ flash_boot() {
   fi;
   if [ ! -f $INSTALLER/common/ak2/boot-new.img ]; then
     ui_print " "; abort "   ! Repacked image could not be found!";
-  fi;  
+  elif [ "$(wc -c < boot-new.img)" -gt "$(wc -c < boot.img)" ]; then
+    ui_print " "; abort "   ! New image larger than boot partition!";
+  fi;
   if [ -f "$bin/flash_erase" -a -f "$bin/nandwrite" ]; then
     $bin/flash_erase $block 0 0;
     $bin/nandwrite -p $block $INSTALLER/common/ak2/boot-new.img;
@@ -365,7 +418,7 @@ flash_boot() {
 write_boot() {
   repack_ramdisk;
   flash_boot;
-}              
+}
 
 # backup_file <file>
 backup_file() { test ! -f $1-idj~ && cp $1 $1-idj~; }
@@ -383,37 +436,38 @@ replace_string() {
 # replace_section <file> <begin search string> <end search string> <replacement string>
 replace_section() {
   begin=`grep -n "$2" $1 | head -n1 | cut -d: -f1`;
-  for end in `grep -n "$3" $1 | cut -d: -f1`; do
-    if [ "$begin" -lt "$end" ]; then
-      if [ "$3" == " " -o -z "$3" ]; then
-        sed -i "/${2//\//\\/}/,/^\s*$/d" $1;
-      else
-        sed -i "/${2//\//\\/}/,/${3//\//\\/}/d" $1;
+  if [ "$begin" ]; then
+    test "$3" == " " -o -z "$3" && endstr='^$' || endstr="$3";
+    for end in `grep -n "$endstr" $1 | cut -d: -f1`; do
+      if [ "$end" ] && [ "$begin" -lt "$end" ]; then
+        if [ "$3" == " " -o -z "$3" ]; then
+          sed -i "/${2//\//\\/}/,/^\s*$/d" $1;
+        else
+          sed -i "/${2//\//\\/}/,/${3//\//\\/}/d" $1;
+        fi;
+        sed -i "${begin}s;^;${4}\n;" $1;
+        break;
       fi;
-      sed -i "${begin}s;^;${4}\n;" $1;
-      break;
-    fi;
-  done;
+    done;
+  fi;
 }
 
 # remove_section <file> <begin search string> <end search string>
 remove_section() {
   begin=`grep -n "$2" $1 | head -n1 | cut -d: -f1`;
-  for end in `grep -n "$3" $1 | cut -d: -f1`; do
-    if [ "$begin" -lt "$end" ]; then
-      if [ "$3" == " " -o -z "$3" ]; then
-        sed -i "/${2//\//\\/}/,/^\s*$/d" $1;
-      else
-        sed -i "/${2//\//\\/}/,/${3//\//\\/}/d" $1;
+  if [ "$begin" ]; then
+    test "$3" == " " -o -z "$3" && endstr='^$' || endstr="$3";
+    for end in `grep -n "$endstr" $1 | cut -d: -f1`; do
+      if [ "$end" ] && [ "$begin" -lt "$end" ]; then
+        if [ "$3" == " " -o -z "$3" ]; then
+          sed -i "/${2//\//\\/}/,/^\s*$/d" $1;
+        else
+          sed -i "/${2//\//\\/}/,/${3//\//\\/}/d" $1;
+        fi;
+        break;
       fi;
-      break;
-    fi;
-  done;
-}
-
-# remove_section_mod <file> <line match>
-remove_section_mod() {
-  sed -i "/${2//\//\\/}/,/^$/d" $1
+    done;
+  fi;
 }
 
 # insert_line <file> <if search string> <before|after> <line match string> <inserted line>
@@ -424,7 +478,7 @@ insert_line() {
       after) offset=1;;
     esac;
     line=$((`grep -n "$4" $1 | head -n1 | cut -d: -f1` + offset));
-    if [ -f $1 ] && [ "$(wc -l $1 | cut -d\  -f1)" -lt "$line" ]; then
+    if [ -f $1 -a "$line" ] && [ "$(wc -l $1 | cut -d\  -f1)" -lt "$line" ]; then
       echo "$5" >> $1;
     else
       sed -i "${line}s;^;${5}\n;" $1;
@@ -528,4 +582,14 @@ patch_prop() {
   fi;
 }
 
+# allow multi-partition ramdisk modifying configurations (using reset_ak)
+if [ ! -d "$ramdisk" -a ! -d "$patch" ]; then
+  if [ -d "$(basename $block)-files" ]; then
+    cp -af /tmp/anykernel/$(basename $block)-files/* /tmp/anykernel;
+  else
+    mkdir -p /tmp/anykernel/$(basename $block)-files;
+  fi;
+  touch /tmp/anykernel/$(basename $block)-files/current;
+fi;
+test ! -d "$ramdisk" && mkdir -p $ramdisk;
 ## end methods

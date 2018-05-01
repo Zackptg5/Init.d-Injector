@@ -33,7 +33,7 @@ PROPFILE=false
 POSTFSDATA=true
 
 # Set to true if you need late_start service script
-LATESTARTSERVICE=false
+LATESTARTSERVICE=true
 
 # Unity Variables
 # Uncomment and change 'MINAPI' and 'MAXAPI' to the minimum and maxium android version for your mod (note that magisk has it's own minimum api: 21 (lollipop))
@@ -49,15 +49,10 @@ LATESTARTSERVICE=false
 # Custom Variables - Keep everything within this function
 unity_custom() {
   # Patch boot img if not using root solution that supports boot scripts
-  if [ "$MODPATH" == "/system/etc/init.d" ]; then
+  if ! $MAGISK || $SYSOVERRIDE; then
     ui_print "   Using Anykernel2 by osm0sis @ xda-developers"
     rm -f $INFO
-    sed -i -e "s|<INSTALLER>|$INSTALLER|" -e "s|<OUTFD>|$OUTFD|" -e "s|<BOOTMODE>|$BOOTMODE|" $INSTALLER/common/ak2/anykernel.sh
-    if [ -z $SLOT ]; then 
-      sed -i "/<SLOT>/d" $INSTALLER/common/ak2/anykernel.sh
-    else
-      sed -i "s|<SLOT>|$SLOT|" $INSTALLER/common/ak2/anykernel.sh
-    fi
+    sed -i -e "s|<INSTALLER>|$INSTALLER|" -e "s|<OUTFD>|$OUTFD|" -e "s|<BOOTMODE>|$BOOTMODE|" -e "s|<SLOT>|$SLOT|" -e "s|<MAGISK>|$MAGISK|" $INSTALLER/common/ak2/anykernel.sh
     mkdir -p $INSTALLER/common/ak2/bin
     cd $INSTALLER/common/ak2
     case $ABILONG in
@@ -136,7 +131,6 @@ set_permissions() {
   $MAGISK && set_perm_recursive $MODPATH 0 0 0755 0644
  
   # CUSTOM PERMISSIONS
-  set_perm $UNITY/system/etc/init.d/0000InitdinjectorTest 0 0 0755
   
   # Some templates if you have no idea what to do:
   # Note that all files/folders have the $UNITY prefix - keep this prefix on all of your files/folders

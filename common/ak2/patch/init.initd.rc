@@ -1,6 +1,22 @@
 # Run init.d scripts
-service sysinit /system/bin/logwrapper /system/bin/sysinit
+service initdinject /system/bin/initd.sh
     class post-fs-data
     seclabel u:r:<DOMAIN>:s0
     user root
+    group root
     oneshot
+    disabled
+    
+service initdinjectls /system/bin/initd.sh -ls
+    class late_start
+    seclabel u:r:<DOMAIN>:s0
+    user root
+    group root
+    oneshot
+    disabled
+
+on post-fs-data
+    start initdinject
+    
+on late_start
+    start initdinjectls

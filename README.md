@@ -6,6 +6,10 @@ Built with Unity installer by Zackptg5 (https://github.com/Zackptg5/Unity) and A
 [More details in support thread](https://forum.xda-developers.com/android/software-hacking/mod-universal-init-d-injector-wip-t3692105).
 
 ## Change Log
+### v1.3 - 5.xx.2018
+* Redid ak2 logic - redo scripting (uses initd.sh rather than sysinit), has capability to run init.d scripts as post-fs-data (default) and late_start (add '-ls' to the end of the name of it), use this logic for all system installs
+* Update it so it'll work with sysover if user chooses
+
 ### v1.2.1 - 4.26.2018
 * Unity v1.5.3 update
 
