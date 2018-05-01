@@ -69,18 +69,24 @@ done
 
 # begin ramdisk changes
 if [ -z $ACTION ]; then
+  scripts_install() {
+    ui_print "   Installing scripts..."
+    sed -i "s/<DOMAIN>/$DOMAIN/g" $INSTALLER/common/ak2/patch/init.initd.rc
+    cp_ch_nb $INSTALLER/common/ak2/patch/init.initd.rc /system/etc/init/init.initd.rc 0644 false
+    cp_ch_nb $INSTALLER/common/ak2/patch/initd.sh /system/bin/initd.sh 0755 false
+  }
+  
   ui_print "- Installing"    
   # add proper init.d patch
   if [ "$INITFILE" ]; then
     if [ "$(sed -n "/service sysinit/,/^$/{/seclabel/p}" $INITFILE)" ]; then
       ui_print "   Sysinit w/ seclabel detected in $(echo $INITFILE | sed "s|$ramdisk||")!"
       DOMAIN=$(sed -n "/service sysinit/,/^$/{/seclabel u:r:.*:s0/{s/.*seclabel u:r:\(.*\):s0.*/\1/; p}}" $INITFILE)
+    else
+      scripts_install
     fi
   else
-    ui_print "   Installing scripts..."
-    sed -i "s/<DOMAIN>/$DOMAIN/g" $INSTALLER/common/ak2/patch/init.initd.rc
-    cp_ch_nb $INSTALLER/common/ak2/patch/init.initd.rc /system/etc/init/init.initd.rc 0644 false
-    cp_ch_nb $INSTALLER/common/ak2/patch/initd.sh /system/bin/initd.sh 0755 false
+    scripts_install
   fi
   
   case $DOMAIN in
