@@ -214,8 +214,8 @@ flash_boot() {
     kernel=`ls *-zImage`;
     kernel=$split_img/$kernel;
   fi;
-  if [ -f $INSTALLER/common/ak2/ramdisk-new.cpio.$compext ]; then
-    rd=$INSTALLER/common/ak2/ramdisk-new.cpio.$compext;
+  if [ -f $INSTALLER/common/ak2/ramdisk-new.cpio.* ]; then
+    rd=`echo $INSTALLER/common/ak2/ramdisk-new.cpio.*`;
   else
     rd=`ls *-ramdisk.*`;
     rd="$split_img/$rd";
