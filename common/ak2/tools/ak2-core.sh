@@ -18,6 +18,7 @@ file_getprop() { grep "^$2=" "$1" | cut -d= -f2; }
 
 # reset anykernel directory
 reset_ak() {
+  local i;
   rm -rf $(dirname $INSTALLER/common/ak2/*-files/current)/ramdisk;
   for i in $ramdisk $split_img $INSTALLER/common/ak2/rdtmp $INSTALLER/common/ak2/boot.img $INSTALLER/common/ak2/*-new*; do
     cp -af $i $(dirname $INSTALLER/common/ak2/*-files/current);
@@ -26,86 +27,9 @@ reset_ak() {
   . $INSTALLER/common/ak2/tools/ak2-core.sh $FD;
 }
 
-# find the location of the boot block
-find_boot() {
-	# if we already have boot block set then verify and use it
-	[ "$block" == "auto" ] || return
-	# otherwise, time to go hunting!
-	if [ -f /etc/recovery.fstab ]; then
-		# recovery fstab v1
-		block=$(awk '$1 == "/boot" {print $3}' /etc/recovery.fstab)
-		[ "$block" ]  && return
-		# recovery fstab v2
-		block=$(awk '$2 == "/boot" {print $1}' /etc/recovery.fstab)
-		[ "$block" ]  && return
-	fi
-	for fstab in /fstab.*; do
-		[ -f "$fstab" ] || continue
-		# device fstab v2
-		block=$(awk '$2 == "/boot" {print $1}' "$fstab")
-		[ "$block" ]  && return
-		# device fstab v1
-		block=$(awk '$1 == "/boot" {print $3}' "$fstab")
-		[ "$block" ]  && return
-	done
-	if [ -f /proc/emmc ]; then
-		# emmc layout
-		block=$(awk '$4 == "\"boot\"" {print $1}' /proc/emmc)
-		[ "$block" ] && block=/dev/block/$(echo "$block" | cut -f1 -d:)  && return
-	fi
-	if [ -f /proc/mtd ]; then
-		# mtd layout
-		block=$(awk '$4 == "\"boot\"" {print $1}' /proc/mtd)
-		[ "$block" ] && block=/dev/block/$(echo "$block" | cut -f1 -d:)  && return
-	fi
-	if [ -f /proc/dumchar_info ]; then
-		# mtk layout
-		block=$(awk '$1 == "/boot" {print $5}' /proc/dumchar_info)
-		[ "$block" ]  && return
-	fi
-	abort "Unable to find boot block location!"
-}
-# Slot device support
-slot_device() {
-  if [ ! -z $SLOT ]; then           
-    if [ -d $ramdisk/.subackup -o -d $ramdisk/.backup ]; then
-      patch_cmdline "skip_override" "skip_override"
-    else
-      patch_cmdline "skip_override" ""
-    fi
-    # Overlay stuff
-    if [ -d $ramdisk/.backup ]; then
-      overlay=$ramdisk/overlay
-    elif [ -d $ramdisk/.subackup ]; then
-      overlay=$ramdisk/boot
-    fi
-    for rdfile in $list; do
-      rddir=$(dirname $rdfile)
-      mkdir -p $overlay/$rddir
-      test ! -f $overlay/$rdfile && cp -rp /system/$rdfile $overlay/$rddir/
-    done                       
-  else
-    overlay=$ramdisk
-  fi
-}
-# Detect if boot.img is signed - credits to chainfire @xda-developers
-signedboot_check() {
-  unset LD_LIBRARY_PATH
-  BOOTSIGNATURE="/system/bin/dalvikvm -Xbootclasspath:/system/framework/core-oj.jar:/system/framework/core-libart.jar:/system/framework/conscrypt.jar:/system/framework/bouncycastle.jar -Xnodex2oat -Xnoimage-dex2oat -cp $bin/avb-signing/BootSignature_Android.jar com.android.verity.BootSignature"
-  if [ ! -f "/system/bin/dalvikvm" ]; then
-    # if we don't have dalvikvm, we want the same behavior as boot.art/oat not found
-    RET="initialize runtime"
-  else
-    RET=$($BOOTSIGNATURE -verify $INSTALLER/common/ak2/boot.img 2>&1)
-  fi
-  test ! -z $SLOT && RET=$($BOOTSIGNATURE -verify $INSTALLER/common/ak2/boot.img 2>&1)
-  if (`echo $RET | grep "VALID" >/dev/null 2>&1`); then
-    ui_print "Signed boot img detected!"
-    SIGNED=true
-  fi
-}
 # dump boot and extract ramdisk
 split_boot() {
+  local nooktest nookoff dumpfail;
   if [ ! -e "$(echo $block | cut -d\  -f1)" ]; then
     ui_print " "; abort "   ! Invalid partition. Aborting...";
   fi;
@@ -129,7 +53,7 @@ split_boot() {
       mkdir $split_img/elftool_out;
       $bin/elftool unpack -i $INSTALLER/common/ak2/boot.img -o $split_img/elftool_out;
       cp -f $split_img/elftool_out/header $split_img/boot.img-header;
-    fi;                  
+    fi;
     $bin/unpackelf -i $INSTALLER/common/ak2/boot.img -o $split_img;
     mv -f $split_img/boot.img-ramdisk.cpio.gz $split_img/boot.img-ramdisk.gz;
   elif [ -f "$bin/dumpimage" ]; then
@@ -169,6 +93,7 @@ split_boot() {
   fi;
 }
 unpack_ramdisk() {
+  local compext unpackcmd;
   if [ -f "$bin/mkmtkhdr" ]; then
     dd bs=512 skip=1 conv=notrunc if=$split_img/boot.img-ramdisk.gz of=$split_img/temprd;
     mv -f $split_img/temprd $split_img/boot.img-ramdisk.gz;
@@ -196,15 +121,13 @@ unpack_ramdisk() {
   test ! -z "$(ls $INSTALLER/common/ak2/rdtmp)" && cp -af $INSTALLER/common/ak2/rdtmp/* $ramdisk;
 }
 dump_boot() {
-  find_boot;
-  slot_device;
-  signedboot_check;
   split_boot;
   unpack_ramdisk;
 }
 
 # repack ramdisk then build and write image
 repack_ramdisk() {
+  local compext repackcmd;
   case $ramdisk_compression in
     auto|"") compext=`echo $split_img/*-ramdisk.cpio.* | rev | cut -d. -f1 | rev`;;
     *) compext=$ramdisk_compression;;
@@ -234,6 +157,7 @@ repack_ramdisk() {
   fi;
 }
 flash_boot() {
+  local name arch os type comp addr ep cmdline cmd board base pagesize kerneloff ramdiskoff tagsoff osver oslvl second secondoff hash unknown i kernel rd dtb rpm pk8 cert avbtype dtbo dtbo_block;
   cd $split_img;
   if [ -f "$bin/mkimage" ]; then
     name=`cat *-name`;
@@ -295,7 +219,7 @@ flash_boot() {
   else
     rd=`ls *-ramdisk.*`;
     rd="$split_img/$rd";
-  fi;    
+  fi;
   for i in dtb dt.img; do
     if [ -f $INSTALLER/common/ak2/$i ]; then
       dtb="--dt $INSTALLER/common/ak2/$i";
@@ -337,21 +261,19 @@ flash_boot() {
     fi;
     mv -f boot-new-signed.img boot-new.img;
   fi;
-  if [ ! -z $SIGNED ]; then
-    ui_print "   Signing boot image..."
+  if [ -f "$bin/BootSignature_Android.jar" -a -d "$bin/avb" ]; then
     pk8=`ls $bin/avb/*.pk8`;
     cert=`ls $bin/avb/*.x509.*`;
     case $block in
       *recovery*|*SOS*) avbtype=recovery;;
       *) avbtype=boot;;
     esac;
-    savedpath="$LD_LIBRARY_PATH";
-    unset LD_LIBRARY_PATH;
-    /system/bin/dalvikvm -Xbootclasspath:/system/framework/core-oj.jar:/system/framework/core-libart.jar:/system/framework/conscrypt.jar:/system/framework/bouncycastle.jar -Xnodex2oat -Xnoimage-dex2oat -cp $bin/BootSignature_Android.jar com.android.verity.BootSignature /$avbtype boot-new.img $pk8 $cert boot-new-signed.img;
-    if [ $? != 0 ]; then
-      ui_print " "; abort "   ! Signing image failed!";
+    if [ "$(/system/bin/dalvikvm -Xbootclasspath:/system/framework/core-oj.jar:/system/framework/core-libart.jar:/system/framework/conscrypt.jar:/system/framework/bouncycastle.jar -Xnodex2oat -Xnoimage-dex2oat -cp $bin/BootSignature_Android.jar com.android.verity.BootSignature -verify boot.img 2>&1 | grep VALID)" ]; then
+      /system/bin/dalvikvm -Xbootclasspath:/system/framework/core-oj.jar:/system/framework/core-libart.jar:/system/framework/conscrypt.jar:/system/framework/bouncycastle.jar -Xnodex2oat -Xnoimage-dex2oat -cp $bin/BootSignature_Android.jar com.android.verity.BootSignature /$avbtype boot-new.img $pk8 $cert boot-new-signed.img;
+      if [ $? != 0 ]; then
+        ui_print " "; abort "   ! Signing image failed!";
+      fi;
     fi;
-    test "$savedpath" && export LD_LIBRARY_PATH="$savedpath";
     mv -f boot-new-signed.img boot-new.img;
   fi;
   if [ -f "$bin/blobpack" ]; then
@@ -369,7 +291,7 @@ flash_boot() {
   if [ "$(strings $INSTALLER/common/ak2/boot.img | grep SEANDROIDENFORCE )" ]; then
     printf 'SEANDROIDENFORCE' >> boot-new.img;
   fi;
-  if [ "$(grep_prop ro.product.brand)" == "lge" ] || [ "$(grep_prop ro.product.brand)" == "LGE" ]; then 
+  if [ "$(grep_prop ro.product.brand)" == "lge" ] || [ "$(grep_prop ro.product.brand)" == "LGE" ]; then
     case $(grep_prop ro.product.device) in
       d800|d801|d802|d803|ls980|vs980|101f|d850|d852|d855|ls990|vs985|f400) echo -n -e "\x41\xa9\xe4\x67\x74\x4d\x1d\x1b\xa4\x29\xf2\xec\xea\x65\x52\x79" >> boot-new.img;;
     *) ;;
@@ -402,7 +324,7 @@ flash_boot() {
     fi;
   done;
   if [ "$dtbo" ]; then
-    dtbo_block=/dev/block/bootdevice/by-name/dtbo$SLOT;
+    dtbo_block=/dev/block/bootdevice/by-name/dtbo$slot;
     if [ ! -e "$(echo $dtbo_block)" ]; then
       ui_print " "; abort "   ! dtbo partition could not be found!";
     fi;
@@ -429,22 +351,25 @@ restore_file() { test -f $1-idj~ && mv -f $1-idj~ $1; }
 # replace_string <file> <if search string> <original string> <replacement string>
 replace_string() {
   if [ -z "$(grep "$2" $1)" ]; then
-      sed -i "s;${3};${4};" $1;
+    sed -i "s;${3};${4};" $1;
   fi;
 }
 
 # replace_section <file> <begin search string> <end search string> <replacement string>
 replace_section() {
+  local begin endstr last end;
   begin=`grep -n "$2" $1 | head -n1 | cut -d: -f1`;
   if [ "$begin" ]; then
-    test "$3" == " " -o -z "$3" && endstr='^$' || endstr="$3";
-    for end in `grep -n "$endstr" $1 | cut -d: -f1`; do
+    if [ "$3" == " " -o -z "$3" ]; then
+      endstr='^[[:space:]]*$';
+      last=$(wc -l $1 | cut -d\  -f1);
+    else
+      endstr="$3";
+    fi;
+    for end in $(grep -n "$endstr" $1 | cut -d: -f1) $last; do
       if [ "$end" ] && [ "$begin" -lt "$end" ]; then
-        if [ "$3" == " " -o -z "$3" ]; then
-          sed -i "/${2//\//\\/}/,/^\s*$/d" $1;
-        else
-          sed -i "/${2//\//\\/}/,/${3//\//\\/}/d" $1;
-        fi;
+        sed -i "${begin},${end}d" $1;
+        test "$end" == "$last" && echo >> $1;
         sed -i "${begin}s;^;${4}\n;" $1;
         break;
       fi;
@@ -454,16 +379,18 @@ replace_section() {
 
 # remove_section <file> <begin search string> <end search string>
 remove_section() {
+  local begin endstr last end;
   begin=`grep -n "$2" $1 | head -n1 | cut -d: -f1`;
   if [ "$begin" ]; then
-    test "$3" == " " -o -z "$3" && endstr='^$' || endstr="$3";
-    for end in `grep -n "$endstr" $1 | cut -d: -f1`; do
+    if [ "$3" == " " -o -z "$3" ]; then
+      endstr='^[[:space:]]*$';
+      last=$(wc -l $1 | cut -d\  -f1);
+    else
+      endstr="$3";
+    fi;
+    for end in $(grep -n "$endstr" $1 | cut -d: -f1) $last; do
       if [ "$end" ] && [ "$begin" -lt "$end" ]; then
-        if [ "$3" == " " -o -z "$3" ]; then
-          sed -i "/${2//\//\\/}/,/^\s*$/d" $1;
-        else
-          sed -i "/${2//\//\\/}/,/${3//\//\\/}/d" $1;
-        fi;
+        sed -i "${begin},${end}d" $1;
         break;
       fi;
     done;
@@ -472,6 +399,7 @@ remove_section() {
 
 # insert_line <file> <if search string> <before|after> <line match string> <inserted line>
 insert_line() {
+  local offset line;
   if [ -z "$(grep "$2" $1)" ]; then
     case $3 in
       before) offset=0;;
@@ -489,7 +417,7 @@ insert_line() {
 # replace_line <file> <line replace string> <replacement line>
 replace_line() {
   if [ ! -z "$(grep "$2" $1)" ]; then
-    line=`grep -n "$2" $1 | head -n1 | cut -d: -f1`;
+    local line=`grep -n "$2" $1 | head -n1 | cut -d: -f1`;
     sed -i "${line}s;.*;${3};" $1;
   fi;
 }
@@ -497,7 +425,7 @@ replace_line() {
 # remove_line <file> <line match string>
 remove_line() {
   if [ ! -z "$(grep "$2" $1)" ]; then
-    line=`grep -n "$2" $1 | head -n1 | cut -d: -f1`;
+    local line=`grep -n "$2" $1 | head -n1 | cut -d: -f1`;
     sed -i "${line}d" $1;
   fi;
 }
@@ -511,6 +439,7 @@ prepend_file() {
 
 # insert_file <file> <if search string> <before|after> <line match string> <patch file>
 insert_file() {
+  local offset line;
   if [ -z "$(grep "$2" $1)" ]; then
     case $3 in
       before) offset=0;;
@@ -544,6 +473,7 @@ backup_and_remove() {
 
 # patch_fstab <fstab file> <mount match name> <fs match type> <block|mount|fstype|options|flags> <original string> <replacement string>
 patch_fstab() {
+  local entry part newpart newentry;
   entry=$(grep "$2" $1 | grep "$3");
   if [ -z "$(echo "$entry" | grep "$6")" -o "$6" == " " -o -z "$6" ]; then
     case $4 in
@@ -561,6 +491,7 @@ patch_fstab() {
 
 # patch_cmdline <cmdline entry name> <replacement string>
 patch_cmdline() {
+  local cmdfile cmdtmp match;
   cmdfile=`ls $split_img/*-cmdline`;
   if [ -z "$(grep "$1" $cmdfile)" ]; then
     cmdtmp=`cat $cmdfile`;
@@ -577,19 +508,116 @@ patch_prop() {
   if [ -z "$(grep "^$2=" $1)" ]; then
     echo -ne "\n$2=$3\n" >> $1;
   else
-    line=`grep -n "^$2=" $1 | head -n1 | cut -d: -f1`;
+    local line=`grep -n "^$2=" $1 | head -n1 | cut -d: -f1`;
     sed -i "${line}s;.*;${2}=${3};" $1;
+  fi;
+}
+
+# patch_ueventd <ueventd file> <device node> <permissions> <chown> <chgrp>
+patch_ueventd() {
+  local file dev perm user group newentry line;
+  file=$1; dev=$2; perm=$3; user=$4;
+  shift 4;
+  group="$@";
+  newentry=$(printf "%-23s   %-4s   %-8s   %s\n" "$dev" "$perm" "$user" "$group");
+  line=`grep -n "$dev" $file | head -n1 | cut -d: -f1`;
+  if [ "$line" ]; then
+    sed -i "${line}s;.*;${newentry};" $file;
+  else
+    echo -ne "\n$newentry\n" >> $file;
   fi;
 }
 
 # allow multi-partition ramdisk modifying configurations (using reset_ak)
 if [ ! -d "$ramdisk" -a ! -d "$patch" ]; then
   if [ -d "$(basename $block)-files" ]; then
-    cp -af /tmp/anykernel/$(basename $block)-files/* /tmp/anykernel;
+    cp -af $INSTALLER/common/ak2/$(basename $block)-files/* $INSTALLER/common/ak2;
   else
-    mkdir -p /tmp/anykernel/$(basename $block)-files;
+    mkdir -p $INSTALLER/common/ak2/$(basename $block)-files;
   fi;
-  touch /tmp/anykernel/$(basename $block)-files/current;
+  touch $INSTALLER/common/ak2/$(basename $block)-files/current;
 fi;
 test ! -d "$ramdisk" && mkdir -p $ramdisk;
+
+slot_device() {
+  if [ ! -z $SLOT ]; then
+    if [ -d $ramdisk/.subackup -o -d $ramdisk/.backup ]; then
+      patch_cmdline "skip_override" "skip_override";
+    else
+      patch_cmdline "skip_override" "";
+    fi
+    # Overlay stuff
+    if [ -d $ramdisk/.backup ]; then
+      overlay=$ramdisk/overlay/;
+    elif [ -d $ramdisk/.subackup ]; then
+      overlay=$ramdisk/boot/;
+    fi
+    for rdfile in $list; do
+      rddir=$(dirname $rdfile);
+      mkdir -p $overlay$rddir;
+      test ! -f $overlay$rdfile && cp -rp /system/$rdfile $overlay$rddir/;
+    done
+  fi
+}
+
+# slot detection enabled by is_slot_device=1 or auto (from anykernel.sh)
+case $is_slot_device in
+  1|auto)
+    slot=$(getprop ro.boot.slot_suffix 2>/dev/null);
+    slot=$SLOT
+    test ! "$slot" && slot=$(grep -o 'androidboot.slot_suffix=.*$' /proc/cmdline | cut -d\  -f1 | cut -d= -f2);
+    if [ ! "$slot" ]; then
+      slot=$(getprop ro.boot.slot 2>/dev/null);
+      test ! "$slot" && slot=$(grep -o 'androidboot.slot=.*$' /proc/cmdline | cut -d\  -f1 | cut -d= -f2);
+      test "$slot" && slot=_$slot;
+    fi;
+    if [ ! "$slot" -a "$is_slot_device" == 1 ]; then
+      ui_print " "; ui_print "Unable to determine active boot slot. Aborting..."; exit 1;
+    fi;
+    test "$slot" && slot_device
+  ;;
+esac;
+
+# target block partition detection enabled by block=boot recovery or auto (from anykernel.sh)
+test "$block" == "auto" && block=boot;
+case $block in
+  boot|recovery)
+    case $block in
+      boot) parttype="ramdisk boot BOOT LNX android_boot KERN-A kernel KERNEL";;
+      recovery) parttype="ramdisk_recovey recovery RECOVERY SOS android_recovery";;
+    esac;
+    for name in $parttype; do
+      for part in $name $name$slot; do
+        if [ "$(grep -w "$part" /proc/mtd 2> /dev/null)" ]; then
+          mtdmount=$(grep -w "$part" /proc/mtd);
+          mtdpart=$(echo $mtdmount | cut -d\" -f2);
+          if [ "$mtdpart" == "$part" ]; then
+            mtd=$(echo $mtdmount | cut -d: -f1);
+          else
+            ui_print " "; ui_print "Unable to determine mtd $block partition. Aborting..."; exit 1;
+          fi;
+          target=/dev/mtd/$mtd;
+        elif [ -e /dev/block/bootdevice/by-name/$part ]; then
+          target=/dev/block/bootdevice/by-name/$part;
+        elif [ -e /dev/block/platform/*/by-name/$part ]; then
+          target=/dev/block/platform/*/by-name/$part;
+        elif [ -e /dev/block/platform/*/*/by-name/$part ]; then
+          target=/dev/block/platform/*/*/by-name/$part;
+        fi;
+        test -e "$target" && break 2;
+      done;
+    done;
+    if [ "$target" ]; then
+      block=$(echo -n $target);
+    else
+      ui_print " "; ui_print "Unable to determine $block partition. Aborting..."; exit 1;
+    fi;
+  ;;
+  *)
+    if [ "$slot" ]; then
+      test -e "$block$slot" && block=$block$slot;
+    fi;
+  ;;
+esac;
+
 ## end methods
