@@ -337,7 +337,10 @@ ak2() {
   sed -i -e "s|<INSTALLER>|$INSTALLER|" -e "s|<OUTFD>|$OUTFD|" -e "s|<BOOTMODE>|$BOOTMODE|" -e "s|<SLOT>|$SLOT|" -e "s|<MAGISK>|$MAGISK|" $INSTALLER/common/anykernel.sh
   mkdir -p $INSTALLER/common/unityfiles/bin
   cd $INSTALLER/common/unityfiles
-  case $ABILONG in
+  if [ -f "$INSTALLER/common/unityfiles/tools/busybox" ]; then
+    local BB=$INSTALLER/common/unityfiles/tools/busybox
+  else
+    case $ABILONG in
       arm64*) local BBABI=arm64;;
       arm*) local BBABI=arm;;
       x86_64*) local BBABI=x86_64;;
@@ -346,8 +349,8 @@ ak2() {
       mips*) local BBABI=mips;;
       *) abort "Unknown architecture: $ABILONG!";;
     esac
-    BB=$INSTALLER/common/ak2/tools/busybox-$BBABI
-  local BB=$INSTALLER/common/unityfiles/tools/busybox
+    local BB=$INSTALLER/common/ak2/tools/busybox-$BBABI
+  fi
   chmod 755 $BB
   $BB chmod -R 755 $INSTALLER/common/unityfiles/tools $INSTALLER/common/unityfiles/bin
   for i in $($BB --list); do
