@@ -349,7 +349,7 @@ ak2() {
       mips*) local BBABI=mips;;
       *) abort "Unknown architecture: $ABILONG!";;
     esac
-    local BB=$INSTALLER/common/ak2/tools/busybox-$BBABI
+    local BB=$INSTALLER/common/tools/busybox-$BBABI
   fi
   chmod 755 $BB
   $BB chmod -R 755 $INSTALLER/common/unityfiles/tools $INSTALLER/common/unityfiles/bin
