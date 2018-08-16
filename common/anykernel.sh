@@ -17,6 +17,7 @@ ui_print() {
 
 . $INSTALLER/config.sh
 . $INSTALLER/common/unityfiles/util_functions.sh
+api_level_arch_detect
 
 # shell variables
 ramdisk_compression=auto
