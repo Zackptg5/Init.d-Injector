@@ -3,5 +3,5 @@ if ! $MAGISK || $SYSOVERRIDE; then
   ROOTTYPE="other root/rootless"
   POSTFSDATA=false
   LATESTARTSERVICE=false
-  ak2
+  RAMDISK=true
 fi
