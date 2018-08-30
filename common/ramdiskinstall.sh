@@ -1,13 +1,11 @@
 PATCHONLY=false
 # detect setools (binaries by xmikos @github)
 case $ABILONG in
-  arm64*) SETOOLS=$INSTALLER/common/unityfiles/setools-android/arm64-v8a;;
-  armeabi-v7a*) SETOOLS=$INSTALLER/common/unityfiles/setools-android/armeabi-v7a;;
-  arm*) SETOOLS=$INSTALLER/common/unityfiles/setools-android/armeabi;;
-  x86_64*) SETOOLS=$INSTALLER/common/unityfiles/setools-android/x86_64;;
-  x86*) SETOOLS=$INSTALLER/common/unityfiles/setools-android/x86;;
-  mips64*) SETOOLS=$INSTALLER/common/unityfiles/setools-android/mips64;;
-  mips*) SETOOLS=$INSTALLER/common/unityfiles/setools-android/mips;;
+  x86_64*) SETOOLS=$INSTALLER/common/setools-android/x86_64;;
+  x86*) SETOOLS=$INSTALLER/common/setools-android/x86;;
+  arm64*) SETOOLS=$INSTALLER/common/setools-android/arm64-v8a;;
+  armeabi-v7a*) SETOOLS=$INSTALLER/common/setools-android/armeabi-v7a;;
+  arm*) SETOOLS=$INSTALLER/common/setools-android/armeabi;;
 esac
 chmod -R 0755 $SETOOLS
 
@@ -34,10 +32,9 @@ done
 
 # add proper init.d patch
 if ! $PATCHONLY; then
-  ui_print "   Installing scripts..."
   sed -i "s/<DOMAIN>/$DOMAIN/g" $INSTALLER/common/init.initd.rc
-  cp_ch_nb $INSTALLER/common/init.initd.rc /system/etc/init/init.initd.rc 0644 false
-  cp_ch_nb $INSTALLER/common/initd.sh /system/bin/initd.sh 0755 false
+  cp_ch -n $INSTALLER/common/init.initd.rc /system/etc/init/init.initd.rc
+  cp_ch -np 0755 $INSTALLER/common/initd.sh /system/bin/initd.sh
 fi
 
 case $DOMAIN in
@@ -51,5 +48,5 @@ for FILE in /system/bin/sepolicy-inject /system/xbin/sepolicy-inject /system/bin
   [ -f "$FILE" ] && mv -f $FILE $FILE.bak
 done
 for FILE in sepolicy-inject seinfo sesearch; do
-  cp_ch $SETOOLS/$FILE $RD/sbin/$FILE 0755
+  cp_ch -p 0755 $SETOOLS/$FILE $RD/sbin/$FILE
 done
