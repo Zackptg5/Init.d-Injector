@@ -48,7 +48,7 @@ LATESTARTSERVICE=true
 #DYNAMICOREO=true
 #DYNAMICAPP=true
 #RAMDISK=true
-#DEBUG=true
+DEBUG=true
 
 # Custom Variables - Keep everything within this function
 unity_custom() {
