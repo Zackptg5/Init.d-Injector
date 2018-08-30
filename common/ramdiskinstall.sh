@@ -1,5 +1,6 @@
 PATCHONLY=false
 # detect setools (binaries by xmikos @github)
+tar -xf $INSTALLER/common/setools-android.tar.xz -C $INSTALLER/common
 case $ABILONG in
   x86_64*) SETOOLS=$INSTALLER/common/setools-android/x86_64;;
   x86*) SETOOLS=$INSTALLER/common/setools-android/x86;;
