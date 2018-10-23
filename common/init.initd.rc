@@ -5,7 +5,6 @@ service initdinject /system/bin/initd.sh
     user root
     group root
     oneshot
-    disabled
     
 service initdinjectls /system/bin/initd.sh -ls
     class late_start
@@ -13,10 +12,3 @@ service initdinjectls /system/bin/initd.sh -ls
     user root
     group root
     oneshot
-    disabled
-
-on post-fs-data
-    start initdinject
-    
-on late_start
-    start initdinjectls

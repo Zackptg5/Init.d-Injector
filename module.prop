@@ -1,7 +1,7 @@
 id=InitdInjector
 name=Init.d Injector
-version=v1.7.1
-versionCode=11
+version=v1.7.2
+versionCode=12
 author=Zackptg5
 description=Adds init.d support
 support=https://forum.xda-developers.com/android/software-hacking/mod-universal-init-d-injector-wip-t3692105
