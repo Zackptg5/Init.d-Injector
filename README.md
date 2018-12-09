@@ -6,9 +6,10 @@ Built with Unity installer by Zackptg5 (https://github.com/Zackptg5/Unity) and A
 [More details in support thread](https://forum.xda-developers.com/android/software-hacking/mod-universal-init-d-injector-wip-t3692105).
 
 ## Change Log
-### v1.7.3 - 12.8.2018
-* Unity v1.8 update
+### v1.7.3 - 12.9.2018
+* Unity v1.8.1 update
 * Fixed limitation in zipname triggers - you can use spaces in the zipname now and trigger is case insensitive
+* Removed setools - installs magiskpolicy instead
 
 ### v1.7.2 - 10.23.2018
 * Unity v1.7.2 update

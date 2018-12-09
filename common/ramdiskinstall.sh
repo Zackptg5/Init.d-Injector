@@ -1,19 +1,15 @@
 PATCHONLY=false
-# detect setools (binaries by xmikos @github)
-tar -xf $INSTALLER/common/setools-android.tar.xz -C $INSTALLER/common
-case $ABILONG in
-  x86_64*) SETOOLS=$INSTALLER/common/setools-android/x86_64;;
-  x86*) SETOOLS=$INSTALLER/common/setools-android/x86;;
-  arm64*) SETOOLS=$INSTALLER/common/setools-android/arm64-v8a;;
-  armeabi-v7a*) SETOOLS=$INSTALLER/common/setools-android/armeabi-v7a;;
-  arm*) SETOOLS=$INSTALLER/common/setools-android/armeabi;;
-esac
-chmod -R 0755 $SETOOLS
+# Unpack sesearch (by xmikos @github) and magiskpolicy
+tar -xf $INSTALLER/common/setools.tar.xz -C $INSTALLER/common
+chmod -R 755 $INSTALLER/common/setools/$ARCH32
+echo $PATH | grep -q "$INSTALLER/common/setools/$ARCH32" || export PATH=$INSTALLER/common/setools/$ARCH32:$PATH
+cp -f $INSTALLER/common/unityfiles/$ARCH32/magiskinit $INSTALLER/common/unityfiles/$ARCH32/magiskpolicy
+chmod 0755 $INSTALLER/common/unityfiles/$ARCH32/magiskpolicy
 
 # use sudaemon if present, permissive shell otherwise
-if [ "$($SETOOLS/sesearch --allow -s su $RD/sepolicy)" ]; then
+if [ "$(sesearch --allow -s su $RD/sepolicy)" ]; then
   DOMAIN=su
-elif [ "$($SETOOLS/sesearch --allow -s sudaemon $RD/sepolicy)" ]; then
+elif [ "$($sesearch --allow -s sudaemon $RD/sepolicy)" ]; then
   DOMAIN=sudaemon
 else
   DOMAIN=shell
@@ -40,14 +36,9 @@ fi
 
 case $DOMAIN in
   "su"|"sudaemon") ui_print "   $DOMAIN secontext found! No need for sepolicy patching";;
-  *) ui_print "   Setting $DOMAIN to permissive..."; cp_ch $RD/sepolicy $RD/sepolicy; $SETOOLS/sepolicy-inject -Z $DOMAIN -P $RD/sepolicy;;
+  *) ui_print "   Setting $DOMAIN to permissive..."; cp_ch $RD/sepolicy $RD/sepolicy; magiskpolicy --load $RD/sepolicy --save $RD/sepolicy "permissive $DOMAIN";;
 esac
   
-# copy setools
-ui_print "   Adding setools to /sbin..."
-for FILE in /system/bin/sepolicy-inject /system/xbin/sepolicy-inject /system/bin/seinfo /system/xbin/seinfo /system/bin/sesearch /system/xbin/sesearch; do
-  [ -f "$FILE" ] && mv -f $FILE $FILE.bak
-done
-for FILE in sepolicy-inject seinfo sesearch; do
-  cp_ch -p 0755 $SETOOLS/$FILE $RD/sbin/$FILE
-done
+# copy magiskpolicy
+ui_print "   Adding magiskpolicy to /sbin..."
+cp_ch -p 0755 $INSTALLER/common/unityfiles/$ARCH32/magiskpolicy $RD/sbin/magiskpolicy
