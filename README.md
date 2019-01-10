@@ -6,6 +6,9 @@ Built with Unity installer by Zackptg5 (https://github.com/Zackptg5/Unity) and A
 [More details in support thread](https://forum.xda-developers.com/android/software-hacking/mod-universal-init-d-injector-wip-t3692105).
 
 ## Change Log
+### v1.8.6 - 1.10.2019
+* Unity v3.1 update
+
 ### v1.8.5 - 1.5.2019
 * Unity v3.0 update
 
