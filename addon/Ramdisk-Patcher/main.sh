@@ -32,7 +32,7 @@ flash_image() {
   return 0
 }
 unpack_ramdisk() {
-  local PATHDIR BOOTDIR=$UF/boot
+  local BOOTDIR=$UF/boot
   cp -af $UF/tools/chromeos $BOOTDIR
   chmod -R 0755 $BOOTDIR
   find_boot_image
@@ -55,7 +55,7 @@ unpack_ramdisk() {
     2 ) ui_print "   ChromeOS boot image detected"; CHROMEOS=true;;
   esac
   # Test patch status
-  ui_print "- Checking ramdisk status"
+  ui_print "   Checking ramdisk status"
   if [ -e ramdisk.cpio ]; then
     magiskboot cpio ramdisk.cpio test
     STATUS=$?
@@ -66,7 +66,6 @@ unpack_ramdisk() {
   cd ramdisk
   magiskboot cpio ../ramdisk.cpio "extract"
   cd /
-  ui_print " "
 }
 repack_ramdisk() {
   ui_print "- Repacking ramdisk"
@@ -110,7 +109,9 @@ sign_chromeos() {
 }
 
 api_check -n 17
-$IS64BIT && mv -f $TMPDIR/addon/Ramdisk-Patcher/tools/$ARCH32/magiskinit64 $TMPDIR/addon/Ramdisk-Patcher/tools/$ARCH32/magiskinit
+$IS64BIT && mv -f $TMPDIR/addon/Ramdisk-Patcher/tools/$ARCH32/magiskinit64 $TMPDIR/addon/Ramdisk-Patcher/tools/$ARCH32/magiskinit || rm -f $TMPDIR/addon/Ramdisk-Patcher/tools/$ARCH32/magiskinit64
+cp -f $TMPDIR/addon/Ramdisk-Patcher/tools/$ARCH32/magiskinit $TMPDIR/addon/Ramdisk-Patcher/tools/$ARCH32/magiskpolicy
 chmod -R 0755 $TMPDIR/addon/Ramdisk-Patcher
 cp -R $TMPDIR/addon/Ramdisk-Patcher/tools $UF 2>/dev/null
-cp -f $UF/tools/$ARCH32/magiskinit $UF/tools/$ARCH32/magiskpolicy
+
+unpack_ramdisk
