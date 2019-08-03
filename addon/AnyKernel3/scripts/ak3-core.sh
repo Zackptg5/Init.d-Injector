@@ -155,7 +155,7 @@ repack_ramdisk() {
 
   cd $home;
   case $ramdisk_compression in
-    auto|"") comp=$(ls $split_img/ramdisk.cpio* 2>/dev/null | grep -v 'mtk' | rev | cut -d. -f1 | rev | sed "s/cpio//");;
+    auto|"") comp=$(ls $split_img/ramdisk.cpio.* 2>/dev/null | grep -v 'mtk' | rev | cut -d. -f1 | rev);;
     none|cpio) comp="";;
     gz) comp=gzip;;
     lzo) comp=lzop;;
