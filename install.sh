@@ -94,7 +94,7 @@ set_permissions() {
 unity_custom() {
   # Patch boot img if not using root solution that supports boot scripts
   if $MAGISK && ! $SYSOVER; then
-    rm -rf $TMPDIR/addon/Ramdisk-Patcher
+    rm -rf $TMPDIR/addon/AnyKernel3
   else
     rm -f $TMPDIR/common/post-fs-data.sh $TMPDIR/common/service.sh
   fi

@@ -6,8 +6,9 @@ Built with Unity installer by Zackptg5 (https://github.com/Zackptg5/Unity) and A
 [More details in support thread](https://forum.xda-developers.com/android/software-hacking/mod-universal-init-d-injector-wip-t3692105).
 
 ## Change Log
-### v2.4 - x.xx.2019
-* Update Ramdisk Patcher to magisk 19.2 tools
+### v3.0 - 8.2.2019
+* Update to Unity v4.3
+* Switch to AK3 addon
 
 ### v2.3 - 5.16.2019
 * Update to Unity v4.2
