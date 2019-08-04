@@ -66,6 +66,15 @@ REPLACE="
 
 print_modname() {
   center_and_print # Replace this line if using custom print stuff
+
+  # Move this here to avoid AK3 from ever running if necessary
+  # Patch boot img if not using root solution that supports boot scripts
+  if $MAGISK && ! $SYSOVER; then
+    rm -rf $TMPDIR/addon/AnyKernel3
+  else
+    rm -f $TMPDIR/common/post-fs-data.sh $TMPDIR/common/service.sh
+  fi
+
   unity_main # Don't change this line
 }
 
@@ -77,27 +86,22 @@ set_permissions() {
   # Use $VEN for vendor (Do not use /system$VEN, the $VEN is set to proper vendor path already - could be /vendor, /system/vendor, etc.)
 
   # Some examples:
-  
+
   # For directories (includes files in them):
   # set_perm_recursive  <dirname>                <owner> <group> <dirpermission> <filepermission> <contexts> (default: u:object_r:system_file:s0)
-  
+
   # set_perm_recursive $UNITY/system/lib 0 0 0755 0644
   # set_perm_recursive $UNITY$VEN/lib/soundfx 0 0 0755 0644
 
   # For files (not in directories taken care of above)
   # set_perm  <filename>                         <owner> <group> <permission> <contexts> (default: u:object_r:system_file:s0)
-  
+
   # set_perm $UNITY/system/lib/libart.so 0 0 0644
 }
 
 # Custom Variables for Install AND Uninstall - Keep everything within this function - runs before uninstall/install
 unity_custom() {
-  # Patch boot img if not using root solution that supports boot scripts
-  if $MAGISK && ! $SYSOVER; then
-    rm -rf $TMPDIR/addon/AnyKernel3
-  else
-    rm -f $TMPDIR/common/post-fs-data.sh $TMPDIR/common/service.sh
-  fi
+  :
 }
 
 # Custom Functions for Install AND Uninstall - You can put them here

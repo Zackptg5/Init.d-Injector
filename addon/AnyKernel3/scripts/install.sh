@@ -72,7 +72,7 @@ if ! $OG_AK && [ "$RD" != "/system" ]; then
     sed -i 's|^home=.*|home=$TMPDIR/unitytools|' $TMPDIR/addon/AnyKernel3/ak3-core.sh
     cp_ch -i $TMPDIR/addon/AnyKernel3/ak3-core.sh /system/addon.d/unitytools/ak3-core 0755
     cp_ch -i $TMPDIR/addon/AnyKernel3/addon.sh /system/addon.d/99-unityak.sh 0755
-    cp_ch -i $TMPDIR/addon/AnyKernel3/functions.sh /system/addon.d/unitytools/functions 0755 
+    cp_ch -i $TMPDIR/addon/AnyKernel3/functions.sh /system/addon.d/unitytools/functions 0755
     $MAGISK && ! $SYSOVER && mount -o ro,remount /system
   else
     sed -i -e "/# CUSTOM USER SCRIPT/ r $TMPDIR/common/uninstall.sh" -e '/# CUSTOM USER SCRIPT/d' $TMPDIR/addon/AnyKernel3/noaddon.sh
