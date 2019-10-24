@@ -1,3 +1,6 @@
+# Deprecated
+I won't be working on this anymore cause there's no real point for me. Feel free to pick apart useful pieces or whatever
+
 # Init.d Injector
 Injects init.d support:
 Via post-fs-data script if using magisk
